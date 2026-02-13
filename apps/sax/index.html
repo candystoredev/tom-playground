@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Honor's Sax Jam</title>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -74,6 +74,7 @@
             gap: 4px;
         }
         .note-btn .label { font-size: 0.8rem; opacity: 0.6; }
+        .note-btn, .action-btn { touch-action: manipulation; }
         .note-btn:hover:not(:disabled) {
             background: rgba(255,255,255,0.12);
             border-color: rgba(255,255,255,0.3);
