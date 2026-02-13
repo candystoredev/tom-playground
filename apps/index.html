@@ -44,56 +44,57 @@
         }
         .grid {
             display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
-            gap: 1.25rem;
+            grid-template-columns: 1fr;
+            gap: 0.5rem;
             width: 100%;
-            max-width: 640px;
+            max-width: 480px;
         }
         .card {
-            display: block;
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
             background: #fff;
             border: 1px solid #e8e4de;
-            border-radius: 14px;
-            padding: 1.75rem;
+            border-radius: 10px;
+            padding: 0.7rem 1rem;
             text-decoration: none;
             color: inherit;
-            transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
-            box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+            transition: transform 0.15s ease, box-shadow 0.15s ease, border-color 0.15s ease;
+            box-shadow: 0 1px 2px rgba(0,0,0,0.03);
         }
         .card:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 8px 24px rgba(0,0,0,0.07);
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.06);
             border-color: #d4cfc6;
         }
         .card-icon {
-            width: 44px;
-            height: 44px;
-            border-radius: 10px;
+            width: 34px;
+            height: 34px;
+            border-radius: 8px;
             display: flex;
             align-items: center;
             justify-content: center;
-            font-size: 1.4rem;
-            margin-bottom: 1rem;
+            font-size: 1.1rem;
+            flex-shrink: 0;
         }
         .card-icon.music { background: #f0e8f7; }
         .card-icon.bolt  { background: #e6f0e8; }
+        .card-body { flex: 1; min-width: 0; }
         .card-title {
-            font-size: 1rem;
+            font-size: 0.9rem;
             font-weight: 600;
             color: #1a1a1a;
-            margin-bottom: 0.3rem;
         }
         .card-desc {
-            font-size: 0.85rem;
+            font-size: 0.78rem;
             color: #999;
-            line-height: 1.5;
+            line-height: 1.3;
         }
         .card-arrow {
-            display: block;
-            margin-top: 1rem;
-            font-size: 0.8rem;
-            color: #b8b0a4;
-            transition: color 0.2s;
+            font-size: 0.85rem;
+            color: #c0b8ac;
+            flex-shrink: 0;
+            transition: color 0.15s;
         }
         .card:hover .card-arrow { color: #7a6f60; }
         footer {
@@ -116,14 +117,18 @@
     <div class="grid">
         <a href="sax/" class="card">
             <div class="card-icon music">&#127927;</div>
-            <div class="card-title">Honor's Sax Jam</div>
-            <div class="card-desc">A saxophone music game.</div>
+            <div class="card-body">
+                <div class="card-title">Honor's Sax Jam</div>
+                <div class="card-desc">A saxophone music game.</div>
+            </div>
             <span class="card-arrow">&#8594;</span>
         </a>
         <a href="hello/" class="card">
             <div class="card-icon bolt">&#9889;</div>
-            <div class="card-title">Hello World</div>
-            <div class="card-desc">Deployment smoke test.</div>
+            <div class="card-body">
+                <div class="card-title">Hello World</div>
+                <div class="card-desc">Deployment smoke test.</div>
+            </div>
             <span class="card-arrow">&#8594;</span>
         </a>
     </div>
