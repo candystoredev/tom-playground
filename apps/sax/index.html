@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Honor's Sax Jam</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Georgia', serif;
+            min-height: 100vh;
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+            color: white;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            overflow: hidden;
+        }
+        .stage {
+            text-align: center;
+            position: relative;
+        }
+        .spotlight {
+            width: 300px;
+            height: 300px;
+            border-radius: 50%;
+            background: radial-gradient(circle, rgba(255,215,0,0.3) 0%, transparent 70%);
+            position: absolute;
+            top: -50px;
+            left: 50%;
+            transform: translateX(-50%);
+            animation: pulse 3s ease-in-out infinite;
+        }
+        .honor {
+            font-size: 8rem;
+            position: relative;
+            z-index: 1;
+            animation: bounce 1.5s ease-in-out infinite;
+        }
+        .sax {
+            font-size: 5rem;
+            position: relative;
+            z-index: 1;
+            animation: sway 1s ease-in-out infinite;
+        }
+        h1 {
+            font-size: 2.5rem;
+            margin: 1rem 0 0.5rem;
+            background: linear-gradient(90deg, #ffd700, #ffaa00, #ffd700);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+        .subtitle {
+            font-size: 1.2rem;
+            opacity: 0.8;
+            margin-bottom: 2rem;
+        }
+        .notes-container {
+            position: fixed;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 0;
+        }
+        .note {
+            position: absolute;
+            font-size: 2rem;
+            opacity: 0;
+            animation: float-note 4s ease-out infinite;
+        }
+        .note:nth-child(1) { left: 20%; animation-delay: 0s; }
+        .note:nth-child(2) { left: 40%; animation-delay: 0.7s; }
+        .note:nth-child(3) { left: 60%; animation-delay: 1.4s; }
+        .note:nth-child(4) { left: 75%; animation-delay: 2.1s; }
+        .note:nth-child(5) { left: 35%; animation-delay: 2.8s; }
+        .note:nth-child(6) { left: 55%; animation-delay: 3.5s; }
+        .play-btn {
+            margin-top: 1.5rem;
+            padding: 0.8rem 2rem;
+            font-size: 1.1rem;
+            font-family: 'Georgia', serif;
+            background: linear-gradient(135deg, #ffd700, #ffaa00);
+            color: #1a1a2e;
+            border: none;
+            border-radius: 50px;
+            cursor: pointer;
+            font-weight: bold;
+            transition: transform 0.2s, box-shadow 0.2s;
+            position: relative;
+            z-index: 1;
+        }
+        .play-btn:hover {
+            transform: scale(1.1);
+            box-shadow: 0 0 20px rgba(255, 215, 0, 0.5);
+        }
+        .play-btn.playing {
+            animation: wiggle 0.3s ease-in-out infinite;
+        }
+        @keyframes bounce {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-15px); }
+        }
+        @keyframes sway {
+            0%, 100% { transform: rotate(-5deg); }
+            50% { transform: rotate(5deg); }
+        }
+        @keyframes pulse {
+            0%, 100% { opacity: 0.5; transform: translateX(-50%) scale(1); }
+            50% { opacity: 1; transform: translateX(-50%) scale(1.1); }
+        }
+        @keyframes float-note {
+            0% { opacity: 0; transform: translateY(100vh) rotate(0deg); }
+            20% { opacity: 1; }
+            80% { opacity: 1; }
+            100% { opacity: 0; transform: translateY(-20vh) rotate(360deg); }
+        }
+        @keyframes wiggle {
+            0%, 100% { transform: rotate(0deg); }
+            25% { transform: rotate(-3deg); }
+            75% { transform: rotate(3deg); }
+        }
+    </style>
+</head>
+<body>
+    <div class="notes-container">
+        <div class="note">&#9835;</div>
+        <div class="note">&#9834;</div>
+        <div class="note">&#9833;</div>
+        <div class="note">&#9835;</div>
+        <div class="note">&#9834;</div>
+        <div class="note">&#9833;</div>
+    </div>
+    <div class="stage">
+        <div class="spotlight"></div>
+        <div class="honor">&#128103;</div>
+        <div class="sax">&#127927;</div>
+        <h1>Honor's Sax Jam</h1>
+        <p class="subtitle">The littlest saxophone star</p>
+        <button class="play-btn" onclick="jam()">Let's Jam!</button>
+    </div>
+    <script>
+        const notes = ['C4','D4','E4','F4','G4','A4','B4','C5'];
+        let audioCtx = null;
+
+        function playNote(freq, duration) {
+            if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+            osc.type = 'sawtooth';
+            osc.frequency.value = freq;
+            gain.gain.setValueAtTime(0.15, audioCtx.currentTime);
+            gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + duration);
+            osc.connect(gain);
+            gain.connect(audioCtx.destination);
+            osc.start();
+            osc.stop(audioCtx.currentTime + duration);
+        }
+
+        const freqs = [261.63, 293.66, 329.63, 349.23, 392.00, 440.00, 493.88, 523.25];
+
+        function jam() {
+            const btn = document.querySelector('.play-btn');
+            btn.classList.add('playing');
+            const melody = [];
+            for (let i = 0; i < 8; i++) {
+                melody.push(freqs[Math.floor(Math.random() * freqs.length)]);
+            }
+            melody.forEach((freq, i) => {
+                setTimeout(() => playNote(freq, 0.4), i * 300);
+            });
+            setTimeout(() => btn.classList.remove('playing'), 2400);
+        }
+    </script>
+</body>
+</html>
