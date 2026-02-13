@@ -1,34 +1,37 @@
-name: Deploy Apps
+name: Deploy to GitHub Pages
 
 on:
   push:
     branches:
       - master
-    paths:
-      - 'apps/**'
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
 
 jobs:
   deploy:
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Deploy to Bluehost
-        uses: appleboy/ssh-action@v1
-        with:
-          host: ${{ secrets.SSH_HOST }}
-          username: ${{ secrets.SSH_USERNAME }}
-          key: ${{ secrets.SSH_PRIVATE_KEY }}
-          script: |
-            mkdir -p ~/public_html/app
+      - name: Setup Pages
+        uses: actions/configure-pages@v5
 
-      - name: Deploy files via rsync
-        uses: burnett01/rsync-deployments@7.0.1
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@v3
         with:
-          switches: -avzr --delete
-          path: apps/
-          remote_path: /home2/quarterb/public_html/app/
-          remote_host: ${{ secrets.SSH_HOST }}
-          remote_user: ${{ secrets.SSH_USERNAME }}
-          remote_key: ${{ secrets.SSH_PRIVATE_KEY }}
+          path: apps
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
