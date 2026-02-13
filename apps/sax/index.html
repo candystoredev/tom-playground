@@ -184,6 +184,7 @@
         let score = 0;
         let best = 0;
         let accepting = false;
+        let retryAvailable = false;
 
         const grid = document.getElementById('grid');
         const status = document.getElementById('status');
@@ -295,6 +296,7 @@
 
         function nextRound() {
             round++;
+            retryAvailable = true;
             const next = Math.floor(Math.random() * noteData.length);
             sequence.push(next);
             updateDisplay();
@@ -338,12 +340,19 @@
                 lightUp(index, 'wrong', 600);
                 playWrong();
                 setButtons(false);
-                if (round > best) best = round;
-                updateDisplay();
-                honor.classList.remove('playing');
-                status.textContent = `Game over! You reached round ${round}`;
-                startBtn.textContent = 'Play Again';
-                startBtn.style.display = '';
+
+                if (retryAvailable) {
+                    retryAvailable = false;
+                    status.textContent = "Oops! One more try... Honor will play it again";
+                    setTimeout(() => playSequence(), 1500);
+                } else {
+                    if (round > best) best = round;
+                    updateDisplay();
+                    honor.classList.remove('playing');
+                    status.textContent = `Game over! You reached round ${round}`;
+                    startBtn.textContent = 'Play Again';
+                    startBtn.style.display = '';
+                }
             }
         }
 
