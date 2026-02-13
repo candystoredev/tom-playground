@@ -4,93 +4,127 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Tom's Apps</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Source+Serif+4:wght@600&display=swap" rel="stylesheet">
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
             min-height: 100vh;
-            background: #0f0f0f;
-            color: #e0e0e0;
+            background: #f8f7f4;
+            color: #3a3a3a;
             display: flex;
             flex-direction: column;
             align-items: center;
-            padding: 3rem 1.5rem;
+            padding: 5rem 1.5rem 3rem;
         }
         header {
             text-align: center;
-            margin-bottom: 3rem;
+            margin-bottom: 3.5rem;
         }
         header h1 {
-            font-size: 1.75rem;
+            font-family: 'Source Serif 4', Georgia, serif;
+            font-size: 2rem;
             font-weight: 600;
-            color: #fff;
-            letter-spacing: -0.02em;
+            color: #1a1a1a;
+            letter-spacing: -0.03em;
+        }
+        header .divider {
+            width: 32px;
+            height: 2px;
+            background: #c8b8a0;
+            margin: 1rem auto;
+            border-radius: 1px;
         }
         header p {
-            margin-top: 0.5rem;
             font-size: 0.95rem;
             color: #888;
+            font-weight: 400;
         }
         .grid {
             display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
-            gap: 1rem;
+            grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+            gap: 1.25rem;
             width: 100%;
             max-width: 640px;
         }
         .card {
             display: block;
-            background: #1a1a1a;
-            border: 1px solid #2a2a2a;
-            border-radius: 12px;
-            padding: 1.5rem;
+            background: #fff;
+            border: 1px solid #e8e4de;
+            border-radius: 14px;
+            padding: 1.75rem;
             text-decoration: none;
             color: inherit;
-            transition: border-color 0.2s, background 0.2s;
+            transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.04);
         }
         .card:hover {
-            border-color: #444;
-            background: #222;
+            transform: translateY(-2px);
+            box-shadow: 0 8px 24px rgba(0,0,0,0.07);
+            border-color: #d4cfc6;
         }
         .card-icon {
-            font-size: 1.75rem;
-            margin-bottom: 0.75rem;
+            width: 44px;
+            height: 44px;
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.4rem;
+            margin-bottom: 1rem;
         }
+        .card-icon.music { background: #f0e8f7; }
+        .card-icon.bolt  { background: #e6f0e8; }
         .card-title {
-            font-size: 1.05rem;
+            font-size: 1rem;
             font-weight: 600;
-            color: #fff;
-            margin-bottom: 0.25rem;
+            color: #1a1a1a;
+            margin-bottom: 0.3rem;
         }
         .card-desc {
             font-size: 0.85rem;
-            color: #777;
-            line-height: 1.4;
+            color: #999;
+            line-height: 1.5;
         }
+        .card-arrow {
+            display: block;
+            margin-top: 1rem;
+            font-size: 0.8rem;
+            color: #b8b0a4;
+            transition: color 0.2s;
+        }
+        .card:hover .card-arrow { color: #7a6f60; }
         footer {
             margin-top: auto;
-            padding-top: 3rem;
-            font-size: 0.8rem;
-            color: #444;
+            padding-top: 4rem;
+            font-size: 0.75rem;
+            color: #c0b8ac;
+            letter-spacing: 0.05em;
+            text-transform: uppercase;
         }
     </style>
 </head>
 <body>
     <header>
-        <h1>app.tomhoeck.com</h1>
-        <p>A collection of small apps and experiments.</p>
+        <h1>Tom's Apps</h1>
+        <div class="divider"></div>
+        <p>Small apps and experiments.</p>
     </header>
 
     <div class="grid">
         <a href="sax/" class="card">
-            <div class="card-icon">&#127927;</div>
+            <div class="card-icon music">&#127927;</div>
             <div class="card-title">Honor's Sax Jam</div>
             <div class="card-desc">A saxophone music game.</div>
+            <span class="card-arrow">&#8594;</span>
         </a>
         <a href="hello/" class="card">
-            <div class="card-icon">&#9889;</div>
+            <div class="card-icon bolt">&#9889;</div>
             <div class="card-title">Hello World</div>
             <div class="card-desc">Deployment smoke test.</div>
+            <span class="card-arrow">&#8594;</span>
         </a>
     </div>
 
