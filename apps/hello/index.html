@@ -17,6 +17,13 @@
         h1 { font-size: 3rem; margin-bottom: 1rem; }
         p { font-size: 1.25rem; opacity: 0.9; }
         .check { font-size: 4rem; margin-bottom: 1rem; }
+        .home-link {
+            position: fixed; bottom: 1.25rem; left: 50%;
+            transform: translateX(-50%);
+            font-size: 0.8rem; color: rgba(255,255,255,0.4);
+            text-decoration: none; transition: color 0.2s;
+        }
+        .home-link:hover { color: rgba(255,255,255,0.7); }
     </style>
 </head>
 <body>
@@ -26,5 +33,6 @@
         <p>GitHub Pages deployment is live.</p>
         <p style="margin-top: 1rem; opacity: 0.7;">app.tomhoeck.com/hello</p>
     </div>
+    <a href="../" class="home-link">&larr; All Apps</a>
 </body>
 </html>
