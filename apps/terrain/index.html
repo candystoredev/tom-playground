@@ -1,0 +1,610 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>Terrain Flythrough</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body { width: 100%; height: 100%; overflow: hidden; background: #000; }
+  canvas { display: block; width: 100%; height: 100%; image-rendering: pixelated; }
+  #hud {
+    position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+    pointer-events: none; z-index: 5;
+    font-family: 'Courier New', monospace;
+  }
+  #controls-hint {
+    position: absolute; top: 1rem; left: 1rem;
+    color: rgba(255,255,255,0.7); font-size: 0.7rem;
+    line-height: 1.5; transition: opacity 2s;
+    background: rgba(0,0,0,0.3); padding: 0.6rem 0.8rem;
+    border-radius: 6px; max-width: 260px;
+  }
+  #controls-hint.faded { opacity: 0; }
+  #speed-display {
+    position: absolute; top: 1rem; right: 1rem;
+    color: rgba(255,255,255,0.5); font-size: 0.7rem;
+  }
+  #pin-btn, #sound-btn {
+    position: absolute; pointer-events: auto;
+    background: rgba(255,255,255,0.12); border: 1px solid rgba(255,255,255,0.2);
+    color: rgba(255,255,255,0.7); font-size: 0.7rem;
+    padding: 0.4rem 0.7rem; border-radius: 4px; cursor: pointer;
+    font-family: 'Courier New', monospace;
+  }
+  #pin-btn:hover, #sound-btn:hover { background: rgba(255,255,255,0.25); }
+  #pin-btn { bottom: 3.5rem; right: 1rem; }
+  #sound-btn { bottom: 3.5rem; left: 1rem; }
+  #pins-list {
+    position: absolute; bottom: 5.5rem; right: 1rem;
+    color: rgba(255,255,255,0.6); font-size: 0.65rem;
+    text-align: right; max-height: 120px; overflow-y: auto;
+    pointer-events: auto;
+  }
+  #pins-list div {
+    cursor: pointer; padding: 2px 4px; border-radius: 3px;
+    margin-bottom: 2px;
+  }
+  #pins-list div:hover { background: rgba(255,255,255,0.15); }
+  #touch-zone {
+    position: absolute; bottom: 0; left: 0; right: 0; height: 50%;
+    pointer-events: auto;
+  }
+  .home-link {
+    position: fixed; bottom: 1.25rem; left: 50%; transform: translateX(-50%);
+    font-size: 0.8rem; color: rgba(255,255,255,0.35); text-decoration: none;
+    z-index: 10; font-family: 'Courier New', monospace;
+    pointer-events: auto;
+  }
+  .home-link:hover { color: rgba(255,255,255,0.7); }
+  #daynight {
+    position: absolute; top: 1rem; right: 1rem;
+    color: rgba(255,255,255,0.4); font-size: 0.65rem;
+    text-align: right;
+  }
+</style>
+</head>
+<body>
+<canvas id="cv"></canvas>
+<div id="hud">
+  <div id="controls-hint">
+    WASD / Arrows — Move &amp; Turn<br>
+    Q/E — Strafe &nbsp; R/F — Up/Down<br>
+    Mouse drag — Look around<br>
+    +/- — Speed &nbsp; Touch — Move fwd<br>
+    Gamepad supported
+  </div>
+  <div id="daynight"></div>
+  <div id="speed-display">Speed: 1.0x</div>
+  <button id="pin-btn">📌 Drop Pin</button>
+  <button id="sound-btn">🔊 Sound</button>
+  <div id="pins-list"></div>
+  <div id="touch-zone"></div>
+</div>
+<a href="../" class="home-link">&larr; All Apps</a>
+
+<script>
+// ========== SIMPLEX NOISE ==========
+const F2 = 0.5 * (Math.sqrt(3) - 1);
+const G2 = (3 - Math.sqrt(3)) / 6;
+const grad3 = [[1,1],[−1,1],[1,−1],[−1,−1],[1,0],[−1,0],[0,1],[0,−1]];
+const perm = new Uint8Array(512);
+const permMod8 = new Uint8Array(512);
+(function seedNoise() {
+  const p = new Uint8Array(256);
+  for (let i = 0; i < 256; i++) p[i] = i;
+  // Fisher-Yates with seed
+  let s = 42;
+  for (let i = 255; i > 0; i--) {
+    s = (s * 16807 + 0) % 2147483647;
+    const j = s % (i + 1);
+    [p[i], p[j]] = [p[j], p[i]];
+  }
+  for (let i = 0; i < 512; i++) {
+    perm[i] = p[i & 255];
+    permMod8[i] = perm[i] % 8;
+  }
+})();
+
+function simplex2(xin, yin) {
+  let n0, n1, n2;
+  const s = (xin + yin) * F2;
+  const i = Math.floor(xin + s);
+  const j = Math.floor(yin + s);
+  const t = (i + j) * G2;
+  const x0 = xin - (i - t);
+  const y0 = yin - (j - t);
+  const i1 = x0 > y0 ? 1 : 0;
+  const j1 = x0 > y0 ? 0 : 1;
+  const x1 = x0 - i1 + G2;
+  const y1 = y0 - j1 + G2;
+  const x2 = x0 - 1 + 2 * G2;
+  const y2 = y0 - 1 + 2 * G2;
+  const ii = i & 255, jj = j & 255;
+  let t0 = 0.5 - x0*x0 - y0*y0;
+  if (t0 < 0) n0 = 0;
+  else { t0 *= t0; const gi = permMod8[ii + perm[jj]]; n0 = t0*t0*(grad3[gi][0]*x0+grad3[gi][1]*y0); }
+  let t1 = 0.5 - x1*x1 - y1*y1;
+  if (t1 < 0) n1 = 0;
+  else { t1 *= t1; const gi = permMod8[ii+i1+perm[jj+j1]]; n1 = t1*t1*(grad3[gi][0]*x1+grad3[gi][1]*y1); }
+  let t2 = 0.5 - x2*x2 - y2*y2;
+  if (t2 < 0) n2 = 0;
+  else { t2 *= t2; const gi = permMod8[ii+1+perm[jj+1]]; n2 = t2*t2*(grad3[gi][0]*x2+grad3[gi][1]*y2); }
+  return 70 * (n0 + n1 + n2);
+}
+
+function fbm(x, y, octaves) {
+  let val = 0, amp = 1, freq = 1, max = 0;
+  for (let i = 0; i < octaves; i++) {
+    val += simplex2(x * freq, y * freq) * amp;
+    max += amp;
+    amp *= 0.5;
+    freq *= 2;
+  }
+  return val / max;
+}
+
+function getHeight(wx, wy) {
+  const scale = 0.003;
+  let h = fbm(wx * scale, wy * scale, 6);
+  h = (h + 1) * 0.5; // 0..1
+  // Shape: lower in center, more varied
+  h = Math.pow(h, 1.3);
+  return h * 300; // height in units
+}
+
+// ========== COLOR BY HEIGHT + DAY/NIGHT ==========
+function terrainColor(h, dayT, fogAmt, skyR, skyG, skyB, lightMul) {
+  let r, g, b;
+  if (h < 30) {
+    // Deep water
+    const t = h / 30;
+    r = 20 + t * 20; g = 40 + t * 40; b = 120 + t * 40;
+  } else if (h < 50) {
+    // Shallow water / beach
+    const t = (h - 30) / 20;
+    r = 40 + t * 140; g = 80 + t * 100; b = 160 - t * 100;
+  } else if (h < 80) {
+    // Lowland green
+    const t = (h - 50) / 30;
+    r = 50 + t * 30; g = 140 + t * 20; b = 40 + t * 10;
+  } else if (h < 140) {
+    // Forest
+    const t = (h - 80) / 60;
+    r = 40 + t * 40; g = 120 - t * 30; b = 30 + t * 10;
+  } else if (h < 200) {
+    // Brown hills
+    const t = (h - 140) / 60;
+    r = 100 + t * 50; g = 80 + t * 20; b = 40 + t * 20;
+  } else if (h < 250) {
+    // Rocky
+    const t = (h - 200) / 50;
+    r = 150 + t * 40; g = 130 + t * 40; b = 110 + t * 40;
+  } else {
+    // Snow
+    const t = Math.min((h - 250) / 50, 1);
+    r = 190 + t * 60; g = 200 + t * 50; b = 210 + t * 40;
+  }
+  // Apply day/night lighting
+  r *= lightMul; g *= lightMul; b *= lightMul;
+  // Fog blend
+  r = r * (1 - fogAmt) + skyR * fogAmt;
+  g = g * (1 - fogAmt) + skyG * fogAmt;
+  b = b * (1 - fogAmt) + skyB * fogAmt;
+  return [Math.min(255, r | 0), Math.min(255, g | 0), Math.min(255, b | 0)];
+}
+
+// ========== VOXEL SPACE RENDERER ==========
+const canvas = document.getElementById('cv');
+const ctx = canvas.getContext('2d');
+let W, H, imgData, buf;
+
+function resize() {
+  // Render at reduced resolution for performance
+  const dpr = 1;
+  const scale = window.innerWidth < 600 ? 0.35 : 0.5;
+  W = Math.floor(window.innerWidth * scale);
+  H = Math.floor(window.innerHeight * scale);
+  canvas.width = W;
+  canvas.height = H;
+  imgData = ctx.createImageData(W, H);
+  buf = new Uint32Array(imgData.data.buffer);
+}
+resize();
+window.addEventListener('resize', resize);
+
+// Camera state
+let camX = 500, camY = 500, camZ = 120;
+let camAngle = 0; // yaw in radians
+let camPitch = 0.04; // tilt down slightly
+let speed = 2;
+let speedMul = 1;
+
+// Day/night cycle
+let dayTime = 0.3; // 0..1, 0.25=noon, 0.75=midnight
+const DAY_SPEED = 0.008; // per second
+
+function getSkyColor(dayT) {
+  // dayT: 0..1
+  // noon=0.25, sunset=0.5, midnight=0.75, sunrise=0
+  const c = Math.cos(dayT * Math.PI * 2);
+  const s = Math.max(0, c); // 1 at noon, 0 at twilight, <0 at night
+  const n = Math.max(0, -c); // night factor
+  // Blend sky
+  const r = 30 + 150 * s + 60 * Math.max(0, 1 - Math.abs(dayT * 4 - 2) * 1.5) * (1 - s);
+  const g = 40 + 140 * s;
+  const b = 60 + 160 * s + 20 * n;
+  return [Math.min(255, r | 0), Math.min(255, g | 0), Math.min(255, b | 0)];
+}
+
+function getLightMul(dayT) {
+  const c = Math.cos(dayT * Math.PI * 2);
+  return 0.15 + 0.85 * Math.max(0, c);
+}
+
+// Height cache for performance
+const heightCache = new Map();
+const CACHE_MAX = 200000;
+
+function getHeightCached(ix, iy) {
+  const key = ix * 100003 + iy;
+  let h = heightCache.get(key);
+  if (h !== undefined) return h;
+  h = getHeight(ix, iy);
+  if (heightCache.size > CACHE_MAX) heightCache.clear();
+  heightCache.set(key, h);
+  return h;
+}
+
+function render() {
+  const [skyR, skyG, skyB] = getSkyColor(dayTime);
+  const lightMul = getLightMul(dayTime);
+  const skyCol = (255 << 24) | (skyB << 16) | (skyG << 8) | skyR;
+
+  // Fill sky
+  buf.fill(skyCol);
+
+  const sinA = Math.sin(camAngle);
+  const cosA = Math.cos(camAngle);
+
+  const maxDist = 600;
+  const minDist = 1;
+  const heightScale = 180;
+  const horizon = H * 0.5;
+
+  // For each column on screen
+  const yBuffer = new Float32Array(W);
+  yBuffer.fill(H);
+
+  // Draw front-to-back
+  let dz = 1;
+  let z = minDist;
+
+  while (z < maxDist) {
+    // Left and right points on the current scanline in world space
+    const plx = -cosA * z - sinA * z;
+    const ply = sinA * z - cosA * z;
+    const prx = cosA * z - sinA * z;
+    const pry = -sinA * z - cosA * z;
+
+    const dx = (prx - plx) / W;
+    const dy = (pry - ply) / W;
+
+    const fogAmt = Math.min(1, Math.pow(z / maxDist, 1.8));
+
+    let wx = plx + camX;
+    let wy = ply + camY;
+
+    for (let col = 0; col < W; col++) {
+      const ix = wx | 0;
+      const iy = wy | 0;
+      const h = getHeightCached(ix, iy);
+
+      // Project height to screen Y
+      const relH = (camZ - h) / z * heightScale + horizon - camPitch * heightScale * 2;
+      const screenY = relH | 0;
+
+      if (screenY < yBuffer[col]) {
+        // Draw vertical strip
+        const [cr, cg, cb] = terrainColor(h, dayTime, fogAmt, skyR, skyG, skyB, lightMul);
+        const color = (255 << 24) | (cb << 16) | (cg << 8) | cr;
+
+        const yStart = Math.max(0, screenY);
+        const yEnd = Math.min(H, yBuffer[col]) | 0;
+
+        for (let y = yStart; y < yEnd; y++) {
+          buf[y * W + col] = color;
+        }
+        yBuffer[col] = screenY;
+      }
+
+      wx += dx;
+      wy += dy;
+    }
+
+    z += dz;
+    dz += 0.015;
+  }
+
+  ctx.putImageData(imgData, 0, 0);
+}
+
+// ========== INPUT ==========
+const keys = {};
+window.addEventListener('keydown', e => { keys[e.key.toLowerCase()] = true; });
+window.addEventListener('keyup', e => { keys[e.key.toLowerCase()] = false; });
+
+let mouseDown = false, lastMX = 0, lastMY = 0;
+let mouseDX = 0, mouseDY = 0;
+
+canvas.addEventListener('mousedown', e => { mouseDown = true; lastMX = e.clientX; lastMY = e.clientY; });
+window.addEventListener('mouseup', () => { mouseDown = false; });
+window.addEventListener('mousemove', e => {
+  if (!mouseDown) return;
+  mouseDX += (e.clientX - lastMX) * 0.003;
+  mouseDY += (e.clientY - lastMY) * 0.002;
+  lastMX = e.clientX; lastMY = e.clientY;
+});
+
+// Touch
+let touchMoving = false;
+let touchLook = false;
+let touchStartX = 0, touchStartY = 0;
+let touchDX = 0, touchDY = 0;
+
+const touchZone = document.getElementById('touch-zone');
+
+document.addEventListener('touchstart', e => {
+  const t = e.touches[0];
+  if (t.clientY < window.innerHeight * 0.5) {
+    touchLook = true;
+  } else {
+    touchMoving = true;
+  }
+  touchStartX = t.clientX;
+  touchStartY = t.clientY;
+  touchDX = 0; touchDY = 0;
+}, { passive: true });
+
+document.addEventListener('touchmove', e => {
+  const t = e.touches[0];
+  if (touchLook) {
+    touchDX = (t.clientX - touchStartX) * 0.004;
+    touchDY = (t.clientY - touchStartY) * 0.003;
+  }
+}, { passive: true });
+
+document.addEventListener('touchend', () => {
+  touchMoving = false;
+  touchLook = false;
+  touchDX = 0; touchDY = 0;
+}, { passive: true });
+
+// Gyroscope
+let gyroYaw = 0, gyroPitch = 0;
+let gyroEnabled = false;
+window.addEventListener('deviceorientation', e => {
+  if (e.gamma === null) return;
+  gyroEnabled = true;
+  gyroYaw = (e.gamma || 0) * 0.001;
+  gyroPitch = ((e.beta || 0) - 45) * 0.0005;
+});
+
+// Gamepad
+function readGamepad() {
+  const gps = navigator.getGamepads ? navigator.getGamepads() : [];
+  for (const gp of gps) {
+    if (!gp) continue;
+    const deadzone = 0.15;
+    let lx = gp.axes[0] || 0, ly = gp.axes[1] || 0;
+    let rx = gp.axes[2] || 0, ry = gp.axes[3] || 0;
+    if (Math.abs(lx) < deadzone) lx = 0;
+    if (Math.abs(ly) < deadzone) ly = 0;
+    if (Math.abs(rx) < deadzone) rx = 0;
+    if (Math.abs(ry) < deadzone) ry = 0;
+    return { lx, ly, rx, ry };
+  }
+  return { lx: 0, ly: 0, rx: 0, ry: 0 };
+}
+
+// Speed control
+window.addEventListener('keydown', e => {
+  if (e.key === '+' || e.key === '=') { speedMul = Math.min(5, speedMul + 0.25); updateSpeedDisplay(); }
+  if (e.key === '-' || e.key === '_') { speedMul = Math.max(0.25, speedMul - 0.25); updateSpeedDisplay(); }
+});
+
+function updateSpeedDisplay() {
+  document.getElementById('speed-display').textContent = 'Speed: ' + speedMul.toFixed(1) + 'x';
+}
+
+// ========== PINS ==========
+let pins = JSON.parse(localStorage.getItem('terrain_pins') || '[]');
+
+function renderPins() {
+  const el = document.getElementById('pins-list');
+  el.innerHTML = '';
+  pins.forEach((p, i) => {
+    const d = document.createElement('div');
+    d.textContent = `Pin ${i+1}: (${p.x|0}, ${p.y|0})`;
+    d.addEventListener('click', () => {
+      camX = p.x; camY = p.y; camZ = p.z; camAngle = p.angle;
+    });
+    el.appendChild(d);
+  });
+}
+
+document.getElementById('pin-btn').addEventListener('click', () => {
+  pins.push({ x: camX, y: camY, z: camZ, angle: camAngle });
+  if (pins.length > 10) pins.shift();
+  localStorage.setItem('terrain_pins', JSON.stringify(pins));
+  renderPins();
+});
+renderPins();
+
+// ========== AUDIO ==========
+let audioCtx = null;
+let audioStarted = false;
+let windGain = null;
+
+function initAudio() {
+  if (audioStarted) return;
+  audioStarted = true;
+  audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+
+  // Wind: filtered noise
+  const bufferSize = audioCtx.sampleRate * 2;
+  const noiseBuffer = audioCtx.createBuffer(1, bufferSize, audioCtx.sampleRate);
+  const data = noiseBuffer.getChannelData(0);
+  for (let i = 0; i < bufferSize; i++) data[i] = Math.random() * 2 - 1;
+
+  const noise = audioCtx.createBufferSource();
+  noise.buffer = noiseBuffer;
+  noise.loop = true;
+
+  const lp = audioCtx.createBiquadFilter();
+  lp.type = 'lowpass';
+  lp.frequency.value = 400;
+  lp.Q.value = 0.5;
+
+  const hp = audioCtx.createBiquadFilter();
+  hp.type = 'highpass';
+  hp.frequency.value = 80;
+
+  windGain = audioCtx.createGain();
+  windGain.gain.value = 0.08;
+
+  noise.connect(lp);
+  lp.connect(hp);
+  hp.connect(windGain);
+  windGain.connect(audioCtx.destination);
+  noise.start();
+
+  // Second layer: higher wind
+  const noise2 = audioCtx.createBufferSource();
+  noise2.buffer = noiseBuffer;
+  noise2.loop = true;
+  noise2.playbackRate.value = 0.5;
+
+  const lp2 = audioCtx.createBiquadFilter();
+  lp2.type = 'lowpass';
+  lp2.frequency.value = 200;
+
+  const g2 = audioCtx.createGain();
+  g2.gain.value = 0.04;
+
+  noise2.connect(lp2);
+  lp2.connect(g2);
+  g2.connect(audioCtx.destination);
+  noise2.start();
+
+  document.getElementById('sound-btn').textContent = '🔇 Mute';
+}
+
+let soundOn = false;
+document.getElementById('sound-btn').addEventListener('click', () => {
+  if (!audioStarted) {
+    initAudio();
+    soundOn = true;
+  } else {
+    soundOn = !soundOn;
+    if (windGain) windGain.gain.value = soundOn ? 0.08 : 0;
+    document.getElementById('sound-btn').textContent = soundOn ? '🔇 Mute' : '🔊 Sound';
+  }
+});
+
+// ========== MAIN LOOP ==========
+let lastTime = 0;
+
+function update(dt) {
+  const gp = readGamepad();
+  const moveSpeed = speed * speedMul * dt * 60;
+  const turnSpeed = 0.04 * dt * 60;
+
+  // Turn
+  if (keys['arrowleft'] || keys['a']) camAngle -= turnSpeed;
+  if (keys['arrowright'] || keys['d']) camAngle += turnSpeed;
+
+  // Pitch (limited)
+  if (keys['arrowup']) camPitch -= turnSpeed * 0.4;
+  if (keys['arrowdown']) camPitch += turnSpeed * 0.4;
+
+  // Move forward/back
+  let fwd = 0, strafe = 0;
+  if (keys['w']) fwd += moveSpeed;
+  if (keys['s']) fwd -= moveSpeed;
+  if (keys['q']) strafe -= moveSpeed;
+  if (keys['e']) strafe += moveSpeed;
+
+  // Altitude
+  if (keys['r']) camZ += moveSpeed * 0.6;
+  if (keys['f']) camZ -= moveSpeed * 0.6;
+
+  // Mouse look
+  camAngle += mouseDX;
+  camPitch += mouseDY;
+  mouseDX = 0; mouseDY = 0;
+
+  // Touch
+  if (touchMoving) fwd += moveSpeed;
+  if (touchLook) {
+    camAngle += touchDX * 0.3;
+    camPitch += touchDY * 0.3;
+  }
+
+  // Gyro
+  if (gyroEnabled) {
+    camAngle += gyroYaw;
+    camPitch += gyroPitch;
+  }
+
+  // Gamepad
+  camAngle += gp.rx * turnSpeed * 2;
+  camPitch += gp.ry * turnSpeed;
+  fwd -= gp.ly * moveSpeed;
+  strafe += gp.lx * moveSpeed;
+
+  // Clamp pitch
+  camPitch = Math.max(-1.5, Math.min(1.5, camPitch));
+
+  // Apply movement
+  camX += Math.sin(camAngle) * fwd + Math.cos(camAngle) * strafe;
+  camY += Math.cos(camAngle) * fwd - Math.sin(camAngle) * strafe;
+
+  // Keep above terrain
+  const terrH = getHeightCached(camX | 0, camY | 0);
+  if (camZ < terrH + 10) camZ = terrH + 10;
+
+  // Day/night
+  dayTime += DAY_SPEED * dt;
+  if (dayTime > 1) dayTime -= 1;
+
+  // Update wind volume based on speed
+  if (windGain && soundOn) {
+    windGain.gain.value = 0.04 + 0.06 * speedMul / 5;
+  }
+}
+
+function frame(ts) {
+  const dt = Math.min(0.1, (ts - lastTime) / 1000);
+  lastTime = ts;
+
+  update(dt);
+  render();
+
+  // Day/night indicator
+  const hour = ((dayTime * 24 + 6) % 24);
+  document.getElementById('daynight').textContent =
+    `${hour.toFixed(1)}h  Alt: ${camZ.toFixed(0)}`;
+
+  requestAnimationFrame(frame);
+}
+
+requestAnimationFrame(ts => { lastTime = ts; frame(ts); });
+
+// Fade controls hint after 5s
+setTimeout(() => {
+  document.getElementById('controls-hint').classList.add('faded');
+}, 5000);
+</script>
+</body>
+</html>

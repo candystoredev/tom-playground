@@ -1,0 +1,970 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Ballistics Calculator + Range Log</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg: #1a2218;
+    --bg2: #232e20;
+    --bg3: #2c3a28;
+    --bg4: #354530;
+    --amber: #d4a017;
+    --amber-dim: #b8890f;
+    --amber-glow: #f0c040;
+    --text: #c8cfc6;
+    --text-dim: #8a9488;
+    --border: #3e5038;
+    --row-even: rgba(255,255,255,0.03);
+    --row-hover: rgba(212,160,23,0.08);
+    --mono: 'Courier New', Courier, monospace;
+    --sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  }
+
+  html { font-size: 15px; }
+  body {
+    font-family: var(--sans);
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    padding-bottom: 4rem;
+  }
+
+  header {
+    background: var(--bg2);
+    border-bottom: 2px solid var(--amber-dim);
+    padding: 1rem 1.25rem 0;
+    position: sticky; top: 0; z-index: 20;
+  }
+  header h1 {
+    font-size: 1.15rem;
+    color: var(--amber);
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    margin-bottom: 0.75rem;
+  }
+
+  .tabs {
+    display: flex; gap: 0;
+  }
+  .tab-btn {
+    background: none; border: none; color: var(--text-dim);
+    padding: 0.5rem 1.25rem; cursor: pointer;
+    font-size: 0.85rem; font-weight: 600;
+    border-bottom: 2px solid transparent;
+    transition: all 0.15s;
+  }
+  .tab-btn:hover { color: var(--text); }
+  .tab-btn.active {
+    color: var(--amber);
+    border-bottom-color: var(--amber);
+  }
+
+  .tab-content { display: none; padding: 1.25rem; max-width: 1100px; margin: 0 auto; }
+  .tab-content.active { display: block; }
+
+  /* Forms */
+  .form-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+    gap: 0.75rem;
+    margin-bottom: 1rem;
+  }
+  .form-group { display: flex; flex-direction: column; gap: 0.25rem; }
+  .form-group label {
+    font-size: 0.72rem;
+    color: var(--text-dim);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    font-weight: 600;
+  }
+  .form-group input, .form-group select, .form-group textarea {
+    background: var(--bg3);
+    border: 1px solid var(--border);
+    color: var(--text);
+    padding: 0.45rem 0.6rem;
+    border-radius: 4px;
+    font-size: 0.9rem;
+    font-family: var(--mono);
+    outline: none;
+    transition: border-color 0.15s;
+  }
+  .form-group input:focus, .form-group select:focus, .form-group textarea:focus {
+    border-color: var(--amber-dim);
+  }
+  .form-group select { font-family: var(--sans); }
+  .form-group textarea { font-family: var(--sans); resize: vertical; min-height: 60px; }
+
+  .btn {
+    background: var(--amber-dim);
+    color: #1a1a0a;
+    border: none;
+    padding: 0.5rem 1.25rem;
+    border-radius: 4px;
+    font-weight: 700;
+    font-size: 0.85rem;
+    cursor: pointer;
+    transition: background 0.15s;
+  }
+  .btn:hover { background: var(--amber); }
+  .btn-row { display: flex; gap: 0.5rem; flex-wrap: wrap; margin-bottom: 1.25rem; }
+  .btn-sm {
+    padding: 0.35rem 0.85rem;
+    font-size: 0.78rem;
+  }
+  .btn-outline {
+    background: transparent;
+    border: 1px solid var(--amber-dim);
+    color: var(--amber);
+  }
+  .btn-outline:hover { background: rgba(212,160,23,0.12); }
+
+  /* Section headings */
+  .section-label {
+    font-size: 0.75rem;
+    color: var(--amber-dim);
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    font-weight: 700;
+    margin: 1.25rem 0 0.5rem;
+    padding-bottom: 0.3rem;
+    border-bottom: 1px solid var(--border);
+  }
+
+  /* Tables */
+  .table-wrap {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    margin: 1rem 0;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+  }
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.82rem;
+    white-space: nowrap;
+  }
+  th {
+    background: var(--bg3);
+    color: var(--amber);
+    font-size: 0.7rem;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    padding: 0.55rem 0.7rem;
+    text-align: right;
+    border-bottom: 2px solid var(--border);
+    position: sticky; top: 0;
+  }
+  th:first-child { text-align: left; }
+  td {
+    padding: 0.4rem 0.7rem;
+    text-align: right;
+    font-family: var(--mono);
+    font-size: 0.8rem;
+    border-bottom: 1px solid rgba(255,255,255,0.04);
+  }
+  td:first-child { text-align: left; }
+  tr:nth-child(even) { background: var(--row-even); }
+  tr:hover { background: var(--row-hover); }
+
+  /* Canvas */
+  .chart-wrap {
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 0.75rem;
+    margin: 1rem 0;
+  }
+  .chart-wrap canvas { width: 100%; height: auto; display: block; }
+
+  /* Range log entries */
+  .log-entry {
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 0.85rem 1rem;
+    margin-bottom: 0.65rem;
+  }
+  .log-entry-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 0.5rem;
+    margin-bottom: 0.4rem;
+  }
+  .log-entry-date {
+    font-size: 0.78rem;
+    color: var(--amber);
+    font-weight: 600;
+    font-family: var(--mono);
+  }
+  .log-entry-firearm {
+    font-weight: 700;
+    font-size: 0.95rem;
+    margin-bottom: 0.15rem;
+  }
+  .log-entry-details {
+    font-size: 0.8rem;
+    color: var(--text-dim);
+    line-height: 1.5;
+  }
+  .log-entry-details span { margin-right: 1rem; }
+  .log-entry-notes {
+    margin-top: 0.35rem;
+    font-size: 0.8rem;
+    font-style: italic;
+    color: var(--text-dim);
+  }
+  .log-delete {
+    background: none; border: none; color: #884430; cursor: pointer;
+    font-size: 0.75rem; padding: 0.2rem 0.4rem; border-radius: 3px;
+  }
+  .log-delete:hover { color: #cc5533; background: rgba(200,60,30,0.1); }
+
+  /* Preset row */
+  .preset-row {
+    display: flex; align-items: flex-end; gap: 0.75rem; margin-bottom: 1rem; flex-wrap: wrap;
+  }
+  .preset-row .form-group { min-width: 220px; }
+
+  /* Home link */
+  .home-link {
+    position: fixed;
+    bottom: 1.25rem;
+    left: 50%;
+    transform: translateX(-50%);
+    font-size: 0.8rem;
+    color: rgba(255,255,255,0.35);
+    text-decoration: none;
+    z-index: 10;
+    transition: color 0.15s;
+  }
+  .home-link:hover { color: rgba(255,255,255,0.7); }
+
+  /* Import file input hidden */
+  #importFile { display: none; }
+
+  @media (max-width: 600px) {
+    .form-grid { grid-template-columns: 1fr 1fr; }
+    header h1 { font-size: 1rem; }
+    .tab-btn { padding: 0.5rem 0.75rem; font-size: 0.78rem; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>Ballistics Calculator + Range Log</h1>
+  <div class="tabs">
+    <button class="tab-btn active" data-tab="calc">Calculator</button>
+    <button class="tab-btn" data-tab="log">Range Log</button>
+  </div>
+</header>
+
+<!-- CALCULATOR TAB -->
+<div class="tab-content active" id="tab-calc">
+
+  <div class="preset-row">
+    <div class="form-group">
+      <label>Common Load Preset</label>
+      <select id="presetSelect">
+        <option value="">-- Select a preset --</option>
+        <option value="223">.223 Rem 55gr FMJ</option>
+        <option value="308">.308 Win 168gr BTHP</option>
+        <option value="65cm">6.5 Creedmoor 140gr ELD-M</option>
+        <option value="3006">.30-06 165gr SP</option>
+        <option value="9mm">9mm 124gr FMJ</option>
+        <option value="45acp">.45 ACP 230gr FMJ</option>
+      </select>
+    </div>
+  </div>
+
+  <div class="section-label">Cartridge &amp; Rifle Parameters</div>
+  <div class="form-grid">
+    <div class="form-group">
+      <label>Caliber Name</label>
+      <input type="text" id="calName" placeholder=".308 Win">
+    </div>
+    <div class="form-group">
+      <label>Bullet Weight (gr)</label>
+      <input type="number" id="bulletWeight" step="0.1" placeholder="168">
+    </div>
+    <div class="form-group">
+      <label>Muzzle Velocity (fps)</label>
+      <input type="number" id="muzzleVel" step="1" placeholder="2650">
+    </div>
+    <div class="form-group">
+      <label>Ballistic Coeff (G1)</label>
+      <input type="number" id="bc" step="0.001" placeholder="0.462">
+    </div>
+    <div class="form-group">
+      <label>Zero Distance (yds)</label>
+      <input type="number" id="zeroDist" step="1" placeholder="100">
+    </div>
+    <div class="form-group">
+      <label>Sight Height (in)</label>
+      <input type="number" id="sightHeight" step="0.01" placeholder="1.5">
+    </div>
+  </div>
+
+  <div class="section-label">Wind</div>
+  <div class="form-grid">
+    <div class="form-group">
+      <label>Crosswind Speed (mph)</label>
+      <input type="number" id="windSpeed" step="0.1" value="10" placeholder="10">
+    </div>
+    <div class="form-group">
+      <label>Increment (yds)</label>
+      <select id="increment">
+        <option value="25">25</option>
+        <option value="50" selected>50</option>
+        <option value="100">100</option>
+      </select>
+    </div>
+  </div>
+
+  <div class="btn-row">
+    <button class="btn" onclick="calculate()">Calculate</button>
+  </div>
+
+  <div id="resultsArea" style="display:none;">
+    <div class="section-label">Trajectory Graph</div>
+    <div class="chart-wrap">
+      <canvas id="trajCanvas" width="1000" height="360"></canvas>
+    </div>
+
+    <div class="section-label">Drop Table</div>
+    <div class="table-wrap">
+      <table id="dropTable">
+        <thead>
+          <tr>
+            <th>Range (yd)</th>
+            <th>Drop (in)</th>
+            <th>Drop (MOA)</th>
+            <th>Drop (MIL)</th>
+            <th>Wind (in)</th>
+            <th>Wind (MOA)</th>
+            <th>Wind (MIL)</th>
+            <th>Vel (fps)</th>
+            <th>Energy (ft-lb)</th>
+            <th>TOF (s)</th>
+          </tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- RANGE LOG TAB -->
+<div class="tab-content" id="tab-log">
+  <div class="section-label">New Log Entry</div>
+  <div class="form-grid">
+    <div class="form-group">
+      <label>Date</label>
+      <input type="date" id="logDate">
+    </div>
+    <div class="form-group">
+      <label>Firearm</label>
+      <input type="text" id="logFirearm" placeholder="Ruger Precision .308">
+    </div>
+    <div class="form-group">
+      <label>Ammo</label>
+      <input type="text" id="logAmmo" placeholder="168gr Federal GMM">
+    </div>
+    <div class="form-group">
+      <label>Temp (&deg;F)</label>
+      <input type="number" id="logTemp" placeholder="72">
+    </div>
+    <div class="form-group">
+      <label>Wind</label>
+      <input type="text" id="logWind" placeholder="5 mph from 3 o'clock">
+    </div>
+    <div class="form-group">
+      <label>Group Size (in)</label>
+      <input type="number" id="logGroup" step="0.01" placeholder="0.75">
+    </div>
+  </div>
+  <div class="form-group" style="margin-bottom:1rem;">
+    <label>Notes</label>
+    <textarea id="logNotes" placeholder="Session notes, observations, adjustments..."></textarea>
+  </div>
+  <div class="btn-row">
+    <button class="btn" onclick="saveLog()">Save Entry</button>
+    <button class="btn btn-sm btn-outline" onclick="exportLogs()">Export JSON</button>
+    <button class="btn btn-sm btn-outline" onclick="document.getElementById('importFile').click()">Import JSON</button>
+    <input type="file" id="importFile" accept=".json" onchange="importLogs(event)">
+  </div>
+
+  <div class="section-label">Past Sessions</div>
+  <div id="logList"></div>
+</div>
+
+<a href="../" class="home-link">&larr; All Apps</a>
+
+<script>
+// ===== PRESETS =====
+const PRESETS = {
+  '223':  { calName: '.223 Rem 55gr FMJ',        bulletWeight: 55,  muzzleVel: 3240, bc: 0.243, zeroDist: 100, sightHeight: 1.5 },
+  '308':  { calName: '.308 Win 168gr BTHP',       bulletWeight: 168, muzzleVel: 2650, bc: 0.462, zeroDist: 100, sightHeight: 1.5 },
+  '65cm': { calName: '6.5 Creedmoor 140gr ELD-M', bulletWeight: 140, muzzleVel: 2710, bc: 0.610, zeroDist: 100, sightHeight: 1.5 },
+  '3006': { calName: '.30-06 165gr SP',            bulletWeight: 165, muzzleVel: 2800, bc: 0.430, zeroDist: 100, sightHeight: 1.5 },
+  '9mm':  { calName: '9mm 124gr FMJ',             bulletWeight: 124, muzzleVel: 1150, bc: 0.145, zeroDist: 25,  sightHeight: 0.9 },
+  '45acp':{ calName: '.45 ACP 230gr FMJ',         bulletWeight: 230, muzzleVel: 830,  bc: 0.195, zeroDist: 25,  sightHeight: 0.9 },
+};
+
+document.getElementById('presetSelect').addEventListener('change', function() {
+  const p = PRESETS[this.value];
+  if (!p) return;
+  document.getElementById('calName').value = p.calName;
+  document.getElementById('bulletWeight').value = p.bulletWeight;
+  document.getElementById('muzzleVel').value = p.muzzleVel;
+  document.getElementById('bc').value = p.bc;
+  document.getElementById('zeroDist').value = p.zeroDist;
+  document.getElementById('sightHeight').value = p.sightHeight;
+});
+
+// ===== TABS =====
+document.querySelectorAll('.tab-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+    document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+    btn.classList.add('active');
+    document.getElementById('tab-' + btn.dataset.tab).classList.add('active');
+  });
+});
+
+// ===== G1 DRAG MODEL =====
+// Standard G1 drag coefficient approximation using Mayevski/Ingalls model
+// Cd as a function of Mach number, piecewise fit
+function g1Drag(mach) {
+  if (mach <= 0)    return 0;
+  if (mach < 0.7)   return 0.1198 + 0.0140 * mach;
+  if (mach < 0.8)   return 0.1198 + 0.1442 * (mach - 0.7);
+  if (mach < 0.9)   return 0.1342 + 0.2844 * (mach - 0.8);
+  if (mach < 0.95)  return 0.1626 + 0.5800 * (mach - 0.9);
+  if (mach < 1.0)   return 0.1916 + 1.0400 * (mach - 0.95);
+  if (mach < 1.05)  return 0.2436 + 0.6640 * (mach - 1.0);
+  if (mach < 1.1)   return 0.2768 + 0.3600 * (mach - 1.05);
+  if (mach < 1.2)   return 0.2948 + 0.1520 * (mach - 1.1);
+  if (mach < 1.3)   return 0.3100 + 0.0400 * (mach - 1.2);
+  if (mach < 1.5)   return 0.3140 - 0.0500 * (mach - 1.3);
+  if (mach < 2.0)   return 0.3040 - 0.0640 * (mach - 1.5);
+  if (mach < 3.0)   return 0.2720 - 0.0400 * (mach - 2.0);
+  return 0.2320 - 0.0140 * (mach - 3.0);
+}
+
+// Reference G1 projectile drag deceleration: a = (v^2 * Cd) / (BC * caliber_factor)
+// We use the standard ballistic formulation:
+// retardation = (rho * v^2 * Cd_ref) / (2 * BC_ref)
+// Simplified: we compute drag via the standard relationship with G1 standard projectile
+
+const GRAVITY = 32.174;       // ft/s^2
+const SPEED_OF_SOUND = 1116;  // fps at std conditions
+
+function computeTrajectory(muzzleVel, bc, zeroDist, sightHeight, maxRange, windMph) {
+  // Point mass model with G1 drag
+  // Step through in small time increments
+  const dt = 0.0005; // seconds
+  const windVel = windMph * 1.46667; // mph to fps
+
+  // State: x (range ft), y (vertical ft), z (lateral ft), vx, vy, vz
+  let x = 0, y = -sightHeight / 12, vx = muzzleVel, vy = 0, vz = 0;
+  let t = 0;
+
+  // We also need a no-wind pass to compute pure drop and separately wind drift
+  // Actually we can compute wind deflection via the "lag time" method or full sim
+  // Let's do full sim with wind as crosswind component
+
+  const maxRangeFt = maxRange * 3;
+  const results = []; // store at each yard
+  let nextYard = 0;
+
+  // First, find the zero angle
+  // We iterate to find the launch angle that gives zero drop at zeroDist
+  let angleRad = 0;
+  // Binary search for zero angle
+  let lo = 0, hi = 0.05; // radians, ~2.8 degrees max
+  for (let iter = 0; iter < 50; iter++) {
+    let mid = (lo + hi) / 2;
+    let yAtZero = simY(muzzleVel, bc, mid, sightHeight, zeroDist);
+    if (yAtZero > 0) hi = mid;
+    else lo = mid;
+  }
+  angleRad = (lo + hi) / 2;
+
+  // Now full simulation with that angle, including wind
+  x = 0;
+  y = -sightHeight / 12;
+  vx = muzzleVel * Math.cos(angleRad);
+  vy = muzzleVel * Math.sin(angleRad);
+  vz = 0;
+  t = 0;
+  nextYard = 0;
+
+  while (x <= maxRangeFt + 3 && t < 10) {
+    const rangeFt = x;
+    const rangeYd = rangeFt / 3;
+
+    if (rangeYd >= nextYard) {
+      const dropIn = y * 12; // feet to inches
+      const driftIn = vz !== undefined ? vz * 0 : 0; // we store z separately
+      results.push({
+        rangeYd: nextYard,
+        dropIn: dropIn, // placeholder, we'll fill from z track
+        vel: Math.sqrt(vx * vx + vy * vy),
+        tof: t,
+        x: x, y: y
+      });
+      nextYard++;
+    }
+
+    // Total velocity relative to air (wind is in z-direction)
+    const vRelX = vx;
+    const vRelY = vy;
+    const vRelZ = vz - windVel;
+    const vRel = Math.sqrt(vRelX * vRelX + vRelY * vRelY + vRelZ * vRelZ);
+    const mach = vRel / SPEED_OF_SOUND;
+    const cd = g1Drag(mach);
+
+    // Drag deceleration magnitude
+    // Standard G1: F/m = (cd * rho * A * v^2) / (2m)
+    // With BC: F/m = cd_g1(mach) * v^2 / (bc * 41.68)
+    // The 41.68 factor converts to proper units with G1 standard
+    // Actually the standard formulation: retardation = Cd * v / BC where Cd is in specific units
+    // Let's use: decel = (G1_drag_function(v) * v) / BC
+    // where G1_drag_function returns retardation per unit BC
+    // Standard: A(v) [ft/s per second per unit BC] tabulated values
+    // Simplified approach: decel = (cd * v^2) / (bc * 20596)
+    // The constant 20596 comes from the reference G1 projectile sectional density and area
+
+    const dragAccel = (cd * vRel * vRel) / (bc * 20596);
+    const ax = -dragAccel * (vRelX / vRel);
+    const ay = -GRAVITY - dragAccel * (vRelY / vRel);
+    const az = -dragAccel * (vRelZ / vRel);
+
+    vx += ax * dt;
+    vy += ay * dt;
+    vz += az * dt;
+    x += vx * dt;
+    y += vy * dt;
+
+    t += dt;
+  }
+
+  return results;
+}
+
+// Quick sim to find y at a given range for zero-finding
+function simY(muzzleVel, bc, angleRad, sightHeight, zeroDistYd) {
+  const dt = 0.0005;
+  const targetX = zeroDistYd * 3; // yards to feet
+  let x = 0, y = -sightHeight / 12;
+  let vx = muzzleVel * Math.cos(angleRad);
+  let vy = muzzleVel * Math.sin(angleRad);
+  let t = 0;
+
+  while (x < targetX && t < 5) {
+    const v = Math.sqrt(vx * vx + vy * vy);
+    const mach = v / SPEED_OF_SOUND;
+    const cd = g1Drag(mach);
+    const dragAccel = (cd * v * v) / (bc * 20596);
+
+    const ax = -dragAccel * (vx / v);
+    const ay = -GRAVITY - dragAccel * (vy / v);
+
+    vx += ax * dt;
+    vy += ay * dt;
+    x += vx * dt;
+    y += vy * dt;
+    t += dt;
+  }
+  return y;
+}
+
+// Full sim with wind returning data at each yard
+function fullSim(muzzleVel, bc, angleRad, sightHeight, maxRange, windMph) {
+  const dt = 0.0002;
+  const windVel = windMph * 1.46667;
+  const maxRangeFt = maxRange * 3;
+
+  let x = 0, y = -sightHeight / 12, z = 0;
+  let vx = muzzleVel * Math.cos(angleRad);
+  let vy = muzzleVel * Math.sin(angleRad);
+  let vz = 0;
+  let t = 0;
+
+  const data = [];
+  let nextYd = 0;
+
+  while (x <= maxRangeFt + 10 && t < 10) {
+    const rangeYd = x / 3;
+
+    while (nextYd <= maxRange && rangeYd >= nextYd) {
+      // Interpolate
+      const vel2d = Math.sqrt(vx * vx + vy * vy);
+      data.push({
+        rangeYd: nextYd,
+        dropIn: y * 12,
+        driftIn: z * 12,
+        vel: vel2d,
+        tof: t
+      });
+      nextYd++;
+    }
+
+    const vRelX = vx;
+    const vRelY = vy;
+    const vRelZ = vz - windVel;
+    const vRel = Math.sqrt(vRelX * vRelX + vRelY * vRelY + vRelZ * vRelZ);
+    if (vRel < 1) break;
+    const mach = vRel / SPEED_OF_SOUND;
+    const cd = g1Drag(mach);
+    const dragAccel = (cd * vRel * vRel) / (bc * 20596);
+
+    const ax = -dragAccel * (vRelX / vRel);
+    const ay = -GRAVITY - dragAccel * (vRelY / vRel);
+    const az = -dragAccel * (vRelZ / vRel);
+
+    vx += ax * dt;
+    vy += ay * dt;
+    vz += az * dt;
+    x += vx * dt;
+    y += vy * dt;
+    z += vz * dt;
+    t += dt;
+  }
+
+  return data;
+}
+
+function calculate() {
+  const mv = parseFloat(document.getElementById('muzzleVel').value);
+  const bc = parseFloat(document.getElementById('bc').value);
+  const zd = parseFloat(document.getElementById('zeroDist').value);
+  const sh = parseFloat(document.getElementById('sightHeight').value);
+  const bw = parseFloat(document.getElementById('bulletWeight').value);
+  const wind = parseFloat(document.getElementById('windSpeed').value) || 0;
+  const inc = parseInt(document.getElementById('increment').value);
+
+  if (!mv || !bc || !zd || !bw) {
+    alert('Please fill in all required fields.');
+    return;
+  }
+
+  // Determine max range based on caliber type (pistol vs rifle)
+  const maxRange = mv < 1500 ? 200 : 1000;
+
+  // Find zero angle
+  let lo = -0.01, hi = 0.06;
+  for (let iter = 0; iter < 60; iter++) {
+    const mid = (lo + hi) / 2;
+    const yAtZero = simY(mv, bc, mid, sh, zd);
+    if (yAtZero > 0) hi = mid;
+    else lo = mid;
+  }
+  const angleRad = (lo + hi) / 2;
+
+  // Full simulation
+  const allData = fullSim(mv, bc, angleRad, sh, maxRange, wind);
+
+  // Extract rows at requested increments
+  const rows = [];
+  for (let r = 0; r <= maxRange; r += inc) {
+    if (r < allData.length) {
+      const d = allData[r];
+      const dropIn = d.dropIn;
+      const driftIn = d.driftIn;
+      const rYd = d.rangeYd;
+
+      // MOA = (drop_inches / range_yards) * (100/1.047)
+      // MIL = (drop_inches / range_yards) * (100/3.6)
+      let dropMOA = 0, dropMIL = 0, windMOA = 0, windMIL = 0;
+      if (rYd > 0) {
+        dropMOA = (dropIn / rYd) * (100 / 1.047);
+        dropMIL = (dropIn / rYd) * (100 / 3.6);
+        windMOA = (driftIn / rYd) * (100 / 1.047);
+        windMIL = (driftIn / rYd) * (100 / 3.6);
+      }
+
+      // Energy: KE = (weight_grains * vel^2) / 450437
+      const energy = (bw * d.vel * d.vel) / 450437;
+
+      rows.push({
+        range: rYd,
+        dropIn, dropMOA, dropMIL,
+        driftIn, windMOA, windMIL,
+        vel: d.vel,
+        energy,
+        tof: d.tof
+      });
+    }
+  }
+
+  // Populate table
+  const tbody = document.querySelector('#dropTable tbody');
+  tbody.innerHTML = '';
+  rows.forEach(r => {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td>${r.range}</td>
+      <td>${r.dropIn.toFixed(1)}</td>
+      <td>${r.dropMOA.toFixed(1)}</td>
+      <td>${r.dropMIL.toFixed(1)}</td>
+      <td>${r.driftIn.toFixed(1)}</td>
+      <td>${r.windMOA.toFixed(1)}</td>
+      <td>${r.windMIL.toFixed(1)}</td>
+      <td>${Math.round(r.vel)}</td>
+      <td>${Math.round(r.energy)}</td>
+      <td>${r.tof.toFixed(3)}</td>
+    `;
+    tbody.appendChild(tr);
+  });
+
+  // Draw trajectory chart
+  drawChart(allData, maxRange, inc);
+
+  document.getElementById('resultsArea').style.display = 'block';
+}
+
+function drawChart(allData, maxRange, inc) {
+  const canvas = document.getElementById('trajCanvas');
+  const dpr = window.devicePixelRatio || 1;
+  const w = canvas.parentElement.clientWidth - 24;
+  const h = 340;
+  canvas.width = w * dpr;
+  canvas.height = h * dpr;
+  canvas.style.width = w + 'px';
+  canvas.style.height = h + 'px';
+  const ctx = canvas.getContext('2d');
+  ctx.scale(dpr, dpr);
+
+  // Find drop range
+  const step = Math.max(1, Math.floor(allData.length / maxRange));
+  let minDrop = 0, maxDrop = 0;
+  const points = [];
+  for (let r = 0; r <= maxRange && r < allData.length; r++) {
+    const d = allData[r];
+    points.push({ x: r, y: d.dropIn });
+    if (d.dropIn < minDrop) minDrop = d.dropIn;
+    if (d.dropIn > maxDrop) maxDrop = d.dropIn;
+  }
+
+  const padL = 60, padR = 20, padT = 25, padB = 35;
+  const plotW = w - padL - padR;
+  const plotH = h - padT - padB;
+
+  // Add some margin to y
+  const yMargin = Math.max(5, (maxDrop - minDrop) * 0.1);
+  const yMin = minDrop - yMargin;
+  const yMax = maxDrop + yMargin;
+
+  function toX(range) { return padL + (range / maxRange) * plotW; }
+  function toY(drop) { return padT + plotH - ((drop - yMin) / (yMax - yMin)) * plotH; }
+
+  // Background
+  ctx.fillStyle = '#1e2a1c';
+  ctx.fillRect(0, 0, w, h);
+
+  // Grid
+  ctx.strokeStyle = 'rgba(255,255,255,0.06)';
+  ctx.lineWidth = 1;
+
+  // Y grid lines
+  const yStep = niceStep(yMax - yMin, 6);
+  const yStart = Math.ceil(yMin / yStep) * yStep;
+  ctx.font = '10px Courier New';
+  ctx.fillStyle = '#8a9488';
+  ctx.textAlign = 'right';
+  for (let v = yStart; v <= yMax; v += yStep) {
+    const py = toY(v);
+    ctx.beginPath(); ctx.moveTo(padL, py); ctx.lineTo(w - padR, py); ctx.stroke();
+    ctx.fillText(v.toFixed(v === 0 ? 0 : 1) + '"', padL - 6, py + 3);
+  }
+
+  // X grid lines
+  const xStep = maxRange <= 200 ? 25 : (maxRange <= 500 ? 50 : 100);
+  ctx.textAlign = 'center';
+  for (let v = 0; v <= maxRange; v += xStep) {
+    const px = toX(v);
+    ctx.beginPath(); ctx.moveTo(px, padT); ctx.lineTo(px, h - padB); ctx.stroke();
+    ctx.fillText(v + 'yd', px, h - padB + 14);
+  }
+
+  // Zero line
+  if (yMin <= 0 && yMax >= 0) {
+    ctx.strokeStyle = 'rgba(212,160,23,0.25)';
+    ctx.lineWidth = 1;
+    ctx.setLineDash([4, 4]);
+    ctx.beginPath(); ctx.moveTo(padL, toY(0)); ctx.lineTo(w - padR, toY(0)); ctx.stroke();
+    ctx.setLineDash([]);
+  }
+
+  // Trajectory curve
+  ctx.strokeStyle = '#d4a017';
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  for (let i = 0; i < points.length; i++) {
+    const px = toX(points[i].x);
+    const py = toY(points[i].y);
+    if (i === 0) ctx.moveTo(px, py);
+    else ctx.lineTo(px, py);
+  }
+  ctx.stroke();
+
+  // Highlight increment dots
+  ctx.fillStyle = '#f0c040';
+  for (let r = 0; r <= maxRange; r += inc) {
+    if (r < points.length) {
+      const px = toX(points[r].x);
+      const py = toY(points[r].y);
+      ctx.beginPath();
+      ctx.arc(px, py, 3, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  }
+
+  // Title
+  ctx.fillStyle = '#d4a017';
+  ctx.font = 'bold 11px -apple-system, sans-serif';
+  ctx.textAlign = 'left';
+  ctx.fillText('Bullet Trajectory (inches)', padL, 14);
+}
+
+function niceStep(range, maxTicks) {
+  const rough = range / maxTicks;
+  const mag = Math.pow(10, Math.floor(Math.log10(rough)));
+  const norm = rough / mag;
+  let step;
+  if (norm <= 1.5) step = 1;
+  else if (norm <= 3) step = 2;
+  else if (norm <= 7) step = 5;
+  else step = 10;
+  return step * mag;
+}
+
+
+// ===== RANGE LOG =====
+function getLogs() {
+  try { return JSON.parse(localStorage.getItem('rangeLogs') || '[]'); }
+  catch { return []; }
+}
+function saveLogs(logs) {
+  localStorage.setItem('rangeLogs', JSON.stringify(logs));
+}
+
+function renderLogs() {
+  const logs = getLogs();
+  const el = document.getElementById('logList');
+  if (logs.length === 0) {
+    el.innerHTML = '<p style="color:var(--text-dim);font-size:0.85rem;">No log entries yet.</p>';
+    return;
+  }
+  // Sort most recent first
+  logs.sort((a, b) => (b.date || '').localeCompare(a.date || '') || b.id - a.id);
+  el.innerHTML = logs.map(l => `
+    <div class="log-entry">
+      <div class="log-entry-header">
+        <div>
+          <div class="log-entry-date">${l.date || 'No date'}</div>
+          <div class="log-entry-firearm">${esc(l.firearm || 'Unknown')}</div>
+        </div>
+        <button class="log-delete" onclick="deleteLog(${l.id})" title="Delete">&times; Delete</button>
+      </div>
+      <div class="log-entry-details">
+        ${l.ammo ? '<span>Ammo: ' + esc(l.ammo) + '</span>' : ''}
+        ${l.temp ? '<span>Temp: ' + esc(l.temp) + '&deg;F</span>' : ''}
+        ${l.wind ? '<span>Wind: ' + esc(l.wind) + '</span>' : ''}
+        ${l.group ? '<span>Group: ' + esc(l.group) + '"</span>' : ''}
+      </div>
+      ${l.notes ? '<div class="log-entry-notes">' + esc(l.notes) + '</div>' : ''}
+    </div>
+  `).join('');
+}
+
+function esc(s) {
+  const d = document.createElement('div');
+  d.textContent = s;
+  return d.innerHTML;
+}
+
+function saveLog() {
+  const entry = {
+    id: Date.now(),
+    date: document.getElementById('logDate').value,
+    firearm: document.getElementById('logFirearm').value.trim(),
+    ammo: document.getElementById('logAmmo').value.trim(),
+    temp: document.getElementById('logTemp').value,
+    wind: document.getElementById('logWind').value.trim(),
+    group: document.getElementById('logGroup').value,
+    notes: document.getElementById('logNotes').value.trim()
+  };
+  if (!entry.firearm && !entry.date) {
+    alert('Please fill in at least a date or firearm name.');
+    return;
+  }
+  const logs = getLogs();
+  logs.push(entry);
+  saveLogs(logs);
+  // Clear form
+  ['logDate','logFirearm','logAmmo','logTemp','logWind','logGroup','logNotes']
+    .forEach(id => document.getElementById(id).value = '');
+  renderLogs();
+}
+
+function deleteLog(id) {
+  if (!confirm('Delete this log entry?')) return;
+  const logs = getLogs().filter(l => l.id !== id);
+  saveLogs(logs);
+  renderLogs();
+}
+
+function exportLogs() {
+  const logs = getLogs();
+  const blob = new Blob([JSON.stringify(logs, null, 2)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'range-log-' + new Date().toISOString().slice(0, 10) + '.json';
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+function importLogs(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = function(e) {
+    try {
+      const imported = JSON.parse(e.target.result);
+      if (!Array.isArray(imported)) throw new Error('Not an array');
+      const logs = getLogs();
+      const existingIds = new Set(logs.map(l => l.id));
+      let added = 0;
+      imported.forEach(entry => {
+        if (!existingIds.has(entry.id)) {
+          logs.push(entry);
+          added++;
+        }
+      });
+      saveLogs(logs);
+      renderLogs();
+      alert(`Imported ${added} new entries (${imported.length - added} duplicates skipped).`);
+    } catch (err) {
+      alert('Invalid JSON file: ' + err.message);
+    }
+  };
+  reader.readAsText(file);
+  event.target.value = '';
+}
+
+// Init
+document.getElementById('logDate').value = new Date().toISOString().slice(0, 10);
+renderLogs();
+</script>
+</body>
+</html>
