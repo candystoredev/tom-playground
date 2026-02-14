@@ -45,7 +45,7 @@
   .menu-btn.active-toggle { background:rgba(51,255,51,0.2); color:var(--amber); border-color:var(--amber); }
 
   /* Game Screen */
-  #game-screen { background:#000; }
+  #game-screen { background:#000; position:relative; }
   #game-hud {
     position:absolute; top:0; left:0; right:0; display:flex; justify-content:space-between; align-items:center;
     padding:0.4rem 0.8rem; z-index:10; font-size:clamp(0.35rem,1.2vw,0.5rem);
@@ -63,6 +63,7 @@
   #touch-controls {
     position:fixed; bottom:0; left:0; right:0; display:none; justify-content:space-between; align-items:flex-end;
     padding:0.8rem 1rem 1rem; z-index:50; pointer-events:none;
+    background:rgba(0,0,0,0.9); border-top:1px solid rgba(51,255,51,0.15);
   }
   #touch-controls.visible { display:flex; }
   .touch-zone { pointer-events:auto; }
@@ -212,7 +213,10 @@ function showScreen(id) {
 function resizeCanvas() {
   const dpr = window.devicePixelRatio || 1;
   const w = window.innerWidth;
-  const h = window.innerHeight;
+  const tc = document.getElementById('touch-controls');
+  const touchVisible = tc.classList.contains('visible');
+  const touchHeight = touchVisible ? tc.offsetHeight : 0;
+  const h = window.innerHeight - touchHeight;
   canvas.style.width = w+'px';
   canvas.style.height = h+'px';
   canvas.width = w * dpr;
@@ -313,8 +317,8 @@ function launchGame(name) {
   currentGame = name;
   showScreen('game-screen');
   hideGameOver();
-  resizeCanvas();
   showTouch(true);
+  resizeCanvas();
   gameRunning = true;
   gameOver = false;
   switch(name) {
