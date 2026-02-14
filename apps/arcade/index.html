@@ -786,7 +786,7 @@ function initPlatformer() {
   const JUMP_FORCE = -12;
   const SPEED = 4;
 
-  let player = { x:80, y:GROUND, vy:0, w:20, h:24, grounded:false, jumping:false };
+  let player = { x:80, y:GROUND-24, vy:0, w:20, h:24, grounded:true, jumping:false };
   let platforms = [];
   let cameraX = 0;
   let distanceTraveled = 0;
@@ -810,8 +810,8 @@ function initPlatformer() {
   }
 
   // Initial ground
-  platforms.push({x:-100, y:GROUND, w:400, h:12});
-  lastPlatEnd = 300;
+  platforms.push({x:-100, y:GROUND, w:600, h:12});
+  lastPlatEnd = 500;
   generatePlatforms();
 
   // Jump via touch/space/a
