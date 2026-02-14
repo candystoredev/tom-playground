@@ -1,0 +1,911 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>Decibel Meter + Exposure Tracker</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg: #1a1a1e;
+    --surface: #242428;
+    --surface2: #2e2e34;
+    --border: #3a3a42;
+    --text: #e8e8ec;
+    --text-dim: #8a8a96;
+    --green: #2ecc40;
+    --yellow: #f5a623;
+    --red: #e74c3c;
+    --green-dim: rgba(46,204,64,0.15);
+    --yellow-dim: rgba(245,166,35,0.15);
+    --red-dim: rgba(231,76,60,0.15);
+  }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    overflow-x: hidden;
+    padding-bottom: 4rem;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .header {
+    text-align: center;
+    padding: 1.25rem 1rem 0.75rem;
+  }
+  .header h1 {
+    font-size: 1.1rem;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--text-dim);
+  }
+
+  /* Start Button */
+  .start-section {
+    text-align: center;
+    padding: 0.5rem 0;
+  }
+  .btn-start {
+    background: var(--green);
+    color: #111;
+    border: none;
+    padding: 0.7rem 2.2rem;
+    border-radius: 6px;
+    font-size: 0.95rem;
+    font-weight: 700;
+    cursor: pointer;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    transition: background 0.2s, transform 0.1s;
+  }
+  .btn-start:hover { transform: scale(1.03); }
+  .btn-start:active { transform: scale(0.98); }
+  .btn-start.active {
+    background: var(--red);
+    color: #fff;
+  }
+
+  /* Gauge */
+  .gauge-container {
+    position: relative;
+    width: 100%;
+    max-width: 380px;
+    margin: 0.75rem auto 0;
+    aspect-ratio: 1.6 / 1;
+  }
+  .gauge-canvas {
+    width: 100%;
+    height: 100%;
+    display: block;
+  }
+  .db-readout {
+    position: absolute;
+    bottom: 12%;
+    left: 50%;
+    transform: translateX(-50%);
+    text-align: center;
+  }
+  .db-value {
+    font-size: 3.5rem;
+    font-weight: 800;
+    font-variant-numeric: tabular-nums;
+    line-height: 1;
+    transition: color 0.15s;
+  }
+  .db-unit {
+    font-size: 0.85rem;
+    color: var(--text-dim);
+    font-weight: 500;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+  .peak-readout {
+    font-size: 0.75rem;
+    color: var(--text-dim);
+    margin-top: 0.15rem;
+  }
+  .peak-readout span { color: var(--red); font-weight: 600; }
+
+  /* Spectrum */
+  .spectrum-container {
+    max-width: 420px;
+    margin: 0.5rem auto;
+    padding: 0 1rem;
+  }
+  .spectrum-label {
+    font-size: 0.65rem;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--text-dim);
+    margin-bottom: 0.25rem;
+  }
+  .spectrum-canvas {
+    width: 100%;
+    height: 100px;
+    border-radius: 6px;
+    background: var(--surface);
+    display: block;
+  }
+
+  /* Exposure */
+  .exposure-section {
+    max-width: 420px;
+    margin: 1rem auto;
+    padding: 0 1rem;
+  }
+  .section-title {
+    font-size: 0.7rem;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: var(--text-dim);
+    margin-bottom: 0.6rem;
+    font-weight: 600;
+  }
+  .zone-bars {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+  .zone-row {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+  }
+  .zone-label {
+    font-size: 0.7rem;
+    font-weight: 600;
+    width: 4.5rem;
+    flex-shrink: 0;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+  }
+  .zone-label.green { color: var(--green); }
+  .zone-label.yellow { color: var(--yellow); }
+  .zone-label.red { color: var(--red); }
+  .zone-bar-bg {
+    flex: 1;
+    height: 1.2rem;
+    background: var(--surface);
+    border-radius: 4px;
+    overflow: hidden;
+    position: relative;
+  }
+  .zone-bar-fill {
+    height: 100%;
+    border-radius: 4px;
+    transition: width 0.5s ease;
+    width: 0%;
+  }
+  .zone-bar-fill.green { background: var(--green); }
+  .zone-bar-fill.yellow { background: var(--yellow); }
+  .zone-bar-fill.red { background: var(--red); }
+  .zone-time {
+    font-size: 0.75rem;
+    font-variant-numeric: tabular-nums;
+    width: 3.8rem;
+    text-align: right;
+    flex-shrink: 0;
+    color: var(--text-dim);
+  }
+
+  /* Warning */
+  .warning-box {
+    max-width: 420px;
+    margin: 0.75rem auto;
+    padding: 0 1rem;
+    display: none;
+  }
+  .warning-box.visible { display: block; }
+  .warning-inner {
+    background: var(--red-dim);
+    border: 1px solid rgba(231,76,60,0.35);
+    border-radius: 6px;
+    padding: 0.65rem 0.85rem;
+    font-size: 0.8rem;
+    color: var(--red);
+    font-weight: 500;
+    line-height: 1.45;
+  }
+
+  /* Session Summary */
+  .session-summary {
+    max-width: 420px;
+    margin: 0.75rem auto;
+    padding: 0 1rem;
+  }
+  .summary-text {
+    font-size: 0.8rem;
+    color: var(--text-dim);
+    line-height: 1.5;
+  }
+  .summary-text strong {
+    color: var(--text);
+  }
+
+  /* History */
+  .history-section {
+    max-width: 420px;
+    margin: 1.25rem auto;
+    padding: 0 1rem;
+  }
+  .history-empty {
+    font-size: 0.8rem;
+    color: var(--text-dim);
+    font-style: italic;
+  }
+  .history-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+  .history-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 0.65rem 0.85rem;
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 0.15rem 1rem;
+  }
+  .history-date {
+    font-size: 0.75rem;
+    color: var(--text-dim);
+  }
+  .history-duration {
+    font-size: 0.75rem;
+    color: var(--text-dim);
+    text-align: right;
+  }
+  .history-stats {
+    grid-column: 1 / -1;
+    display: flex;
+    gap: 1.2rem;
+    font-size: 0.75rem;
+    margin-top: 0.15rem;
+  }
+  .history-stat-label {
+    color: var(--text-dim);
+  }
+  .history-stat-val {
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+  }
+  .history-stat-val.peak { color: var(--red); }
+  .history-stat-val.avg { color: var(--yellow); }
+  .history-exposure {
+    font-size: 0.7rem;
+    color: var(--red);
+    grid-column: 1 / -1;
+    margin-top: 0.1rem;
+  }
+
+  .clear-history {
+    background: none;
+    border: 1px solid var(--border);
+    color: var(--text-dim);
+    padding: 0.4rem 1rem;
+    border-radius: 4px;
+    font-size: 0.7rem;
+    cursor: pointer;
+    margin-top: 0.6rem;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+  }
+  .clear-history:hover { border-color: var(--red); color: var(--red); }
+
+  /* Home link */
+  .home-link {
+    position: fixed;
+    bottom: 1.25rem;
+    left: 50%;
+    transform: translateX(-50%);
+    font-size: 0.8rem;
+    color: rgba(255,255,255,0.35);
+    text-decoration: none;
+    z-index: 10;
+    transition: color 0.2s;
+  }
+  .home-link:hover { color: rgba(255,255,255,0.7); }
+
+  @media (min-width: 500px) {
+    .db-value { font-size: 4.5rem; }
+    .gauge-container { max-width: 440px; }
+    .spectrum-canvas { height: 120px; }
+  }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h1>Decibel Meter</h1>
+</div>
+
+<div class="start-section">
+  <button class="btn-start" id="btnStart">Start Listening</button>
+</div>
+
+<div class="gauge-container">
+  <canvas class="gauge-canvas" id="gaugeCanvas"></canvas>
+  <div class="db-readout">
+    <div class="db-value" id="dbValue">--</div>
+    <div class="db-unit">dB SPL</div>
+    <div class="peak-readout">Peak: <span id="peakValue">--</span> dB</div>
+  </div>
+</div>
+
+<div class="spectrum-container">
+  <div class="spectrum-label">Frequency Spectrum</div>
+  <canvas class="spectrum-canvas" id="spectrumCanvas"></canvas>
+</div>
+
+<div class="exposure-section">
+  <div class="section-title">Exposure Tracker</div>
+  <div class="zone-bars">
+    <div class="zone-row">
+      <div class="zone-label green">&lt; 70 dB</div>
+      <div class="zone-bar-bg"><div class="zone-bar-fill green" id="barGreen"></div></div>
+      <div class="zone-time" id="timeGreen">0:00</div>
+    </div>
+    <div class="zone-row">
+      <div class="zone-label yellow">70-85 dB</div>
+      <div class="zone-bar-bg"><div class="zone-bar-fill yellow" id="barYellow"></div></div>
+      <div class="zone-time" id="timeYellow">0:00</div>
+    </div>
+    <div class="zone-row">
+      <div class="zone-label red">&gt; 85 dB</div>
+      <div class="zone-bar-bg"><div class="zone-bar-fill red" id="barRed"></div></div>
+      <div class="zone-time" id="timeRed">0:00</div>
+    </div>
+  </div>
+</div>
+
+<div class="warning-box" id="warningBox">
+  <div class="warning-inner" id="warningText"></div>
+</div>
+
+<div class="session-summary">
+  <div class="summary-text" id="summaryText">Press <strong>Start Listening</strong> to begin monitoring.</div>
+</div>
+
+<div class="history-section">
+  <div class="section-title">Session History</div>
+  <div id="historyList"></div>
+</div>
+
+<a href="../" class="home-link">&larr; All Apps</a>
+
+<script>
+(function() {
+  // Elements
+  const btnStart = document.getElementById('btnStart');
+  const dbValueEl = document.getElementById('dbValue');
+  const peakValueEl = document.getElementById('peakValue');
+  const gaugeCanvas = document.getElementById('gaugeCanvas');
+  const spectrumCanvas = document.getElementById('spectrumCanvas');
+  const barGreen = document.getElementById('barGreen');
+  const barYellow = document.getElementById('barYellow');
+  const barRed = document.getElementById('barRed');
+  const timeGreen = document.getElementById('timeGreen');
+  const timeYellow = document.getElementById('timeYellow');
+  const timeRed = document.getElementById('timeRed');
+  const warningBox = document.getElementById('warningBox');
+  const warningText = document.getElementById('warningText');
+  const summaryText = document.getElementById('summaryText');
+  const historyList = document.getElementById('historyList');
+
+  // State
+  let audioCtx = null;
+  let analyser = null;
+  let micStream = null;
+  let running = false;
+  let animFrame = null;
+  let peakDb = 0;
+  let peakHoldDb = 0;
+  let peakHoldTimer = 0;
+  let sessionStart = null;
+  let dbSamples = [];
+
+  // Exposure tracking (in seconds)
+  let exposure = { green: 0, yellow: 0, red: 0 };
+  let lastTick = null;
+
+  // OSHA/NIOSH limits: dB level -> max hours
+  const exposureLimits = [
+    { db: 85, hours: 8, label: '85 dB / 8 hours' },
+    { db: 88, hours: 4, label: '88 dB / 4 hours' },
+    { db: 91, hours: 2, label: '91 dB / 2 hours' },
+    { db: 94, hours: 1, label: '94 dB / 1 hour' },
+    { db: 97, hours: 0.5, label: '97 dB / 30 min' },
+    { db: 100, hours: 0.25, label: '100 dB / 15 min' },
+  ];
+
+  // Gauge drawing
+  const gCtx = gaugeCanvas.getContext('2d');
+  const sCtx = spectrumCanvas.getContext('2d');
+
+  function resizeCanvas(canvas, ctx) {
+    const rect = canvas.getBoundingClientRect();
+    const dpr = window.devicePixelRatio || 1;
+    canvas.width = rect.width * dpr;
+    canvas.height = rect.height * dpr;
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    return { w: rect.width, h: rect.height };
+  }
+
+  function drawGauge(db) {
+    const { w, h } = resizeCanvas(gaugeCanvas, gCtx);
+    const cx = w / 2;
+    const cy = h * 0.82;
+    const r = Math.min(w * 0.42, h * 0.72);
+    const startAngle = Math.PI * 1.15;
+    const endAngle = Math.PI * -0.15;
+    const totalSweep = endAngle - startAngle; // negative since we go clockwise visually
+
+    gCtx.clearRect(0, 0, w, h);
+
+    // Draw arc zones
+    const lineW = r * 0.08;
+    gCtx.lineCap = 'butt';
+    gCtx.lineWidth = lineW;
+
+    // Green: 0-70 (0% to 58.3%)
+    // Yellow: 70-85 (58.3% to 70.8%)
+    // Red: 85-120 (70.8% to 100%)
+    const zones = [
+      { start: 0, end: 70/120, color: '#2ecc40' },
+      { start: 70/120, end: 85/120, color: '#f5a623' },
+      { start: 85/120, end: 1, color: '#e74c3c' },
+    ];
+
+    zones.forEach(z => {
+      gCtx.beginPath();
+      gCtx.arc(cx, cy, r, startAngle + totalSweep * z.start, startAngle + totalSweep * z.end, false);
+      gCtx.strokeStyle = z.color;
+      gCtx.globalAlpha = 0.25;
+      gCtx.stroke();
+    });
+
+    // Active arc (filled portion)
+    const clampedDb = Math.max(0, Math.min(120, db));
+    const fraction = clampedDb / 120;
+    const currentAngle = startAngle + totalSweep * fraction;
+
+    zones.forEach(z => {
+      const zStart = startAngle + totalSweep * z.start;
+      const zEnd = startAngle + totalSweep * Math.min(z.end, fraction);
+      if (fraction > z.start) {
+        gCtx.beginPath();
+        gCtx.arc(cx, cy, r, zStart, zEnd, false);
+        gCtx.strokeStyle = z.color;
+        gCtx.globalAlpha = 0.85;
+        gCtx.stroke();
+      }
+    });
+
+    gCtx.globalAlpha = 1;
+
+    // Tick marks
+    for (let i = 0; i <= 12; i++) {
+      const t = i / 12;
+      const angle = startAngle + totalSweep * t;
+      const inner = r - lineW / 2 - 4;
+      const outer = r - lineW / 2 - (i % 3 === 0 ? 16 : 10);
+      gCtx.beginPath();
+      gCtx.moveTo(cx + Math.cos(angle) * inner, cy + Math.sin(angle) * inner);
+      gCtx.lineTo(cx + Math.cos(angle) * outer, cy + Math.sin(angle) * outer);
+      gCtx.strokeStyle = i % 3 === 0 ? 'rgba(255,255,255,0.5)' : 'rgba(255,255,255,0.2)';
+      gCtx.lineWidth = i % 3 === 0 ? 2 : 1;
+      gCtx.stroke();
+
+      // Labels for major ticks
+      if (i % 3 === 0) {
+        const lbl = Math.round(i * 10);
+        const lr = outer - 12;
+        gCtx.font = `600 ${Math.max(9, r * 0.07)}px system-ui, sans-serif`;
+        gCtx.fillStyle = 'rgba(255,255,255,0.45)';
+        gCtx.textAlign = 'center';
+        gCtx.textBaseline = 'middle';
+        gCtx.fillText(lbl, cx + Math.cos(angle) * lr, cy + Math.sin(angle) * lr);
+      }
+    }
+
+    // Needle
+    const needleLen = r - lineW / 2 - 20;
+    gCtx.save();
+    gCtx.translate(cx, cy);
+    gCtx.rotate(currentAngle);
+    gCtx.beginPath();
+    gCtx.moveTo(0, -2.5);
+    gCtx.lineTo(needleLen, 0);
+    gCtx.lineTo(0, 2.5);
+    gCtx.closePath();
+    const needleColor = db < 70 ? '#2ecc40' : db < 85 ? '#f5a623' : '#e74c3c';
+    gCtx.fillStyle = needleColor;
+    gCtx.shadowColor = needleColor;
+    gCtx.shadowBlur = 10;
+    gCtx.fill();
+    gCtx.restore();
+
+    // Needle center dot
+    gCtx.beginPath();
+    gCtx.arc(cx, cy, 5, 0, Math.PI * 2);
+    gCtx.fillStyle = '#555';
+    gCtx.fill();
+
+    // Peak hold indicator
+    if (peakHoldDb > 0) {
+      const peakFraction = Math.max(0, Math.min(1, peakHoldDb / 120));
+      const peakAngle = startAngle + totalSweep * peakFraction;
+      const pi1 = r - lineW / 2 - 2;
+      const pi2 = r + lineW / 2 + 2;
+      gCtx.beginPath();
+      gCtx.moveTo(cx + Math.cos(peakAngle) * pi1, cy + Math.sin(peakAngle) * pi1);
+      gCtx.lineTo(cx + Math.cos(peakAngle) * pi2, cy + Math.sin(peakAngle) * pi2);
+      gCtx.strokeStyle = '#e74c3c';
+      gCtx.lineWidth = 2.5;
+      gCtx.stroke();
+    }
+  }
+
+  // Spectrum drawing
+  function drawSpectrum(dataArray) {
+    const { w, h } = resizeCanvas(spectrumCanvas, sCtx);
+    sCtx.clearRect(0, 0, w, h);
+
+    if (!dataArray) return;
+
+    const barCount = Math.min(dataArray.length, 64);
+    const step = Math.floor(dataArray.length / barCount);
+    const barW = (w - barCount) / barCount;
+    const gap = 1;
+
+    for (let i = 0; i < barCount; i++) {
+      // Average a few bins for smoother look
+      let sum = 0;
+      for (let j = 0; j < step; j++) {
+        sum += dataArray[i * step + j];
+      }
+      const val = sum / step / 255;
+      const barH = val * h * 0.95;
+
+      const x = i * (barW + gap);
+
+      // Color gradient based on frequency
+      let color;
+      const t = i / barCount;
+      if (t < 0.33) {
+        color = `rgba(46, 204, 64, ${0.5 + val * 0.5})`;
+      } else if (t < 0.66) {
+        color = `rgba(245, 166, 35, ${0.5 + val * 0.5})`;
+      } else {
+        color = `rgba(231, 76, 60, ${0.5 + val * 0.5})`;
+      }
+
+      sCtx.fillStyle = color;
+
+      // Rounded top
+      const radius = Math.min(barW / 2, 3);
+      const y = h - barH;
+      sCtx.beginPath();
+      sCtx.moveTo(x, h);
+      sCtx.lineTo(x, y + radius);
+      sCtx.quadraticCurveTo(x, y, x + radius, y);
+      sCtx.lineTo(x + barW - radius, y);
+      sCtx.quadraticCurveTo(x + barW, y, x + barW, y + radius);
+      sCtx.lineTo(x + barW, h);
+      sCtx.closePath();
+      sCtx.fill();
+    }
+  }
+
+  // dB calculation from analyser
+  function getDb() {
+    if (!analyser) return 0;
+    const buf = new Float32Array(analyser.fftSize);
+    analyser.getFloatTimeDomainData(buf);
+    let sum = 0;
+    for (let i = 0; i < buf.length; i++) {
+      sum += buf[i] * buf[i];
+    }
+    const rms = Math.sqrt(sum / buf.length);
+    // Convert to dB, calibrate roughly (mic sensitivity varies)
+    // Using a reference that maps typical browser mic levels to ~60-90 dB range
+    let db = 20 * Math.log10(rms + 1e-10);
+    // Offset to approximate SPL (rough calibration)
+    db = db + 94; // typical calibration offset
+    return Math.max(0, Math.min(130, db));
+  }
+
+  function getFrequencyData() {
+    if (!analyser) return null;
+    const data = new Uint8Array(analyser.frequencyBinCount);
+    analyser.getByteFrequencyData(data);
+    return data;
+  }
+
+  // Format seconds to m:ss or h:mm:ss
+  function fmtTime(sec) {
+    sec = Math.floor(sec);
+    if (sec < 3600) {
+      const m = Math.floor(sec / 60);
+      const s = sec % 60;
+      return m + ':' + String(s).padStart(2, '0');
+    }
+    const h = Math.floor(sec / 3600);
+    const m = Math.floor((sec % 3600) / 60);
+    const s = sec % 60;
+    return h + ':' + String(m).padStart(2, '0') + ':' + String(s).padStart(2, '0');
+  }
+
+  function fmtTimeLong(sec) {
+    sec = Math.floor(sec);
+    const h = Math.floor(sec / 3600);
+    const m = Math.floor((sec % 3600) / 60);
+    const s = sec % 60;
+    const parts = [];
+    if (h > 0) parts.push(h + (h === 1 ? ' hour' : ' hours'));
+    if (m > 0) parts.push(m + (m === 1 ? ' minute' : ' minutes'));
+    if (parts.length === 0) parts.push(s + ' seconds');
+    return parts.join(', ');
+  }
+
+  // Update exposure display
+  function updateExposure() {
+    const total = exposure.green + exposure.yellow + exposure.red;
+    if (total === 0) {
+      barGreen.style.width = '0%';
+      barYellow.style.width = '0%';
+      barRed.style.width = '0%';
+    } else {
+      barGreen.style.width = (exposure.green / total * 100) + '%';
+      barYellow.style.width = (exposure.yellow / total * 100) + '%';
+      barRed.style.width = (exposure.red / total * 100) + '%';
+    }
+    timeGreen.textContent = fmtTime(exposure.green);
+    timeYellow.textContent = fmtTime(exposure.yellow);
+    timeRed.textContent = fmtTime(exposure.red);
+  }
+
+  // Check exposure warnings
+  function checkWarnings() {
+    const dangerousSeconds = exposure.red; // time above 85 dB
+    let warning = '';
+
+    // Find the most relevant OSHA limit
+    // For simplicity, we check against 85 dB / 8 hr since we track cumulative >85dB
+    const pct85 = (dangerousSeconds / (8 * 3600)) * 100;
+    if (pct85 >= 100) {
+      warning = 'OSHA limit EXCEEDED: You have surpassed the 8-hour exposure limit at 85+ dB. Hearing protection required immediately!';
+    } else if (pct85 >= 75) {
+      warning = 'WARNING: You have reached ' + Math.round(pct85) + '% of the OSHA 8-hour exposure limit at 85+ dB. Consider taking a break or using hearing protection.';
+    } else if (pct85 >= 50) {
+      warning = 'Caution: You have reached ' + Math.round(pct85) + '% of the OSHA 8-hour exposure limit at 85+ dB.';
+    } else if (dangerousSeconds >= 15 * 60) {
+      // 15 min above 85dB
+      warning = 'You have been above 85 dB for ' + fmtTimeLong(dangerousSeconds) + '. Consider hearing protection.';
+    }
+
+    if (warning) {
+      warningBox.classList.add('visible');
+      warningText.textContent = warning;
+    } else {
+      warningBox.classList.remove('visible');
+    }
+  }
+
+  // Update session summary
+  function updateSummary() {
+    if (!sessionStart) return;
+    const duration = (Date.now() - sessionStart) / 1000;
+    const avg = dbSamples.length > 0 ? (dbSamples.reduce((a, b) => a + b, 0) / dbSamples.length) : 0;
+
+    let parts = [];
+    parts.push('Session: <strong>' + fmtTimeLong(duration) + '</strong>');
+    parts.push('Avg: <strong>' + avg.toFixed(1) + ' dB</strong>');
+    if (exposure.red > 0) {
+      parts.push('Above 85 dB: <strong>' + fmtTimeLong(exposure.red) + '</strong>');
+    }
+    summaryText.innerHTML = parts.join(' &bull; ');
+  }
+
+  // Main loop
+  function loop() {
+    if (!running) return;
+
+    const db = getDb();
+    const freqData = getFrequencyData();
+    const now = performance.now();
+
+    // dB display
+    const displayDb = db.toFixed(0);
+    dbValueEl.textContent = displayDb;
+    dbValueEl.style.color = db < 70 ? 'var(--green)' : db < 85 ? 'var(--yellow)' : 'var(--red)';
+
+    // Peak hold
+    if (db > peakHoldDb) {
+      peakHoldDb = db;
+      peakHoldTimer = now;
+    } else if (now - peakHoldTimer > 2000) {
+      peakHoldDb = Math.max(db, peakHoldDb - 0.5);
+    }
+
+    if (db > peakDb) peakDb = db;
+    peakValueEl.textContent = peakDb.toFixed(1);
+
+    // Sample for avg
+    dbSamples.push(db);
+    if (dbSamples.length > 100000) dbSamples = dbSamples.slice(-50000);
+
+    // Exposure tracking
+    if (lastTick) {
+      const dt = (now - lastTick) / 1000;
+      if (db < 70) exposure.green += dt;
+      else if (db < 85) exposure.yellow += dt;
+      else exposure.red += dt;
+    }
+    lastTick = now;
+
+    drawGauge(db);
+    drawSpectrum(freqData);
+
+    // Update exposure display every ~500ms
+    if (Math.floor(now / 500) !== Math.floor((now - 16) / 500)) {
+      updateExposure();
+      checkWarnings();
+      updateSummary();
+    }
+
+    animFrame = requestAnimationFrame(loop);
+  }
+
+  // Start / Stop
+  async function startListening() {
+    if (running) {
+      stopListening(true);
+      return;
+    }
+
+    try {
+      micStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      const source = audioCtx.createMediaStreamSource(micStream);
+      analyser = audioCtx.createAnalyser();
+      analyser.fftSize = 2048;
+      analyser.smoothingTimeConstant = 0.8;
+      source.connect(analyser);
+
+      running = true;
+      sessionStart = Date.now();
+      peakDb = 0;
+      peakHoldDb = 0;
+      dbSamples = [];
+      exposure = { green: 0, yellow: 0, red: 0 };
+      lastTick = null;
+
+      btnStart.textContent = 'Stop';
+      btnStart.classList.add('active');
+
+      loop();
+    } catch (e) {
+      alert('Microphone access is required. Please allow microphone permissions and try again.');
+      console.error(e);
+    }
+  }
+
+  function stopListening(save) {
+    running = false;
+    if (animFrame) cancelAnimationFrame(animFrame);
+
+    if (micStream) {
+      micStream.getTracks().forEach(t => t.stop());
+      micStream = null;
+    }
+    if (audioCtx) {
+      audioCtx.close();
+      audioCtx = null;
+      analyser = null;
+    }
+
+    btnStart.textContent = 'Start Listening';
+    btnStart.classList.remove('active');
+
+    // Save session
+    if (save && sessionStart) {
+      const duration = (Date.now() - sessionStart) / 1000;
+      if (duration > 5) { // Only save sessions > 5 seconds
+        const avg = dbSamples.length > 0 ? (dbSamples.reduce((a, b) => a + b, 0) / dbSamples.length) : 0;
+        const session = {
+          date: sessionStart,
+          duration: Math.round(duration),
+          maxDb: Math.round(peakDb * 10) / 10,
+          avgDb: Math.round(avg * 10) / 10,
+          exposureRed: Math.round(exposure.red),
+        };
+        saveSession(session);
+        renderHistory();
+      }
+    }
+
+    // Reset display
+    dbValueEl.textContent = '--';
+    dbValueEl.style.color = '';
+    peakValueEl.textContent = '--';
+    drawGauge(0);
+    drawSpectrum(null);
+    summaryText.innerHTML = 'Session ended. Press <strong>Start Listening</strong> to begin a new session.';
+  }
+
+  // LocalStorage sessions
+  function getSessions() {
+    try {
+      return JSON.parse(localStorage.getItem('db_sessions') || '[]');
+    } catch { return []; }
+  }
+
+  function saveSession(session) {
+    const sessions = getSessions();
+    sessions.unshift(session);
+    // Keep last 20
+    if (sessions.length > 20) sessions.length = 20;
+    localStorage.setItem('db_sessions', JSON.stringify(sessions));
+  }
+
+  function clearSessions() {
+    localStorage.removeItem('db_sessions');
+    renderHistory();
+  }
+
+  function renderHistory() {
+    const sessions = getSessions();
+    if (sessions.length === 0) {
+      historyList.innerHTML = '<div class="history-empty">No sessions recorded yet.</div>';
+      return;
+    }
+
+    // Show last 5
+    const show = sessions.slice(0, 5);
+    let html = '<div class="history-list">';
+    show.forEach(s => {
+      const d = new Date(s.date);
+      const dateStr = d.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
+      const timeStr = d.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' });
+      html += `<div class="history-card">
+        <div class="history-date">${dateStr} ${timeStr}</div>
+        <div class="history-duration">${fmtTime(s.duration)}</div>
+        <div class="history-stats">
+          <span><span class="history-stat-label">Peak </span><span class="history-stat-val peak">${s.maxDb} dB</span></span>
+          <span><span class="history-stat-label">Avg </span><span class="history-stat-val avg">${s.avgDb} dB</span></span>
+        </div>
+        ${s.exposureRed > 0 ? `<div class="history-exposure">Above 85 dB for ${fmtTimeLong(s.exposureRed)}</div>` : ''}
+      </div>`;
+    });
+    html += '</div>';
+    html += '<button class="clear-history" id="clearHistory">Clear History</button>';
+    historyList.innerHTML = html;
+
+    document.getElementById('clearHistory').addEventListener('click', () => {
+      if (confirm('Clear all session history?')) clearSessions();
+    });
+  }
+
+  // Init
+  btnStart.addEventListener('click', startListening);
+  drawGauge(0);
+  drawSpectrum(null);
+  renderHistory();
+
+  // Handle resize
+  window.addEventListener('resize', () => {
+    if (!running) {
+      drawGauge(0);
+      drawSpectrum(null);
+    }
+  });
+})();
+</script>
+</body>
+</html>

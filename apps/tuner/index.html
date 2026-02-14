@@ -1,0 +1,801 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>Guitar Tuner + Chord Library</title>
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --bg: #121212;
+  --bg2: #1a1a1a;
+  --bg3: #222;
+  --amber: #d4a035;
+  --amber-dim: #9a7428;
+  --amber-glow: #e8b84a;
+  --green: #4caf50;
+  --green-glow: #66ff6a;
+  --text: #e0e0e0;
+  --text-dim: rgba(255,255,255,0.45);
+  --radius: 10px;
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  min-height: 100dvh;
+  overflow-x: hidden;
+  padding-bottom: 3.5rem;
+}
+
+/* --- Tabs --- */
+.tabs {
+  display: flex;
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  background: var(--bg);
+  border-bottom: 1px solid #333;
+}
+.tabs button {
+  flex: 1;
+  padding: 14px 0;
+  background: none;
+  border: none;
+  color: var(--text-dim);
+  font-size: 0.95rem;
+  font-weight: 600;
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+  transition: all 0.2s;
+}
+.tabs button.active {
+  color: var(--amber);
+  border-bottom-color: var(--amber);
+}
+
+.panel { display: none; padding: 20px 16px; }
+.panel.active { display: block; }
+
+/* --- Tuner --- */
+.tuner-section { text-align: center; }
+
+.tuning-select-wrap {
+  margin-bottom: 20px;
+}
+.tuning-select-wrap label {
+  font-size: 0.8rem;
+  color: var(--text-dim);
+  margin-right: 8px;
+}
+.tuning-select-wrap select {
+  background: var(--bg3);
+  color: var(--text);
+  border: 1px solid #444;
+  border-radius: 6px;
+  padding: 6px 12px;
+  font-size: 0.9rem;
+  cursor: pointer;
+}
+
+.string-indicators {
+  display: flex;
+  justify-content: center;
+  gap: 8px;
+  margin-bottom: 24px;
+}
+.string-ind {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.85rem;
+  font-weight: 700;
+  background: var(--bg3);
+  border: 2px solid #444;
+  transition: all 0.3s;
+}
+.string-ind.active {
+  border-color: var(--amber);
+  color: var(--amber);
+  box-shadow: 0 0 10px rgba(212,160,53,0.3);
+}
+.string-ind.in-tune {
+  border-color: var(--green);
+  color: var(--green);
+  box-shadow: 0 0 14px rgba(76,175,80,0.5);
+}
+
+/* Gauge */
+.gauge-wrap {
+  position: relative;
+  width: 280px;
+  height: 160px;
+  margin: 0 auto 20px;
+}
+.gauge-bg {
+  width: 280px;
+  height: 160px;
+}
+
+.note-display {
+  margin-bottom: 8px;
+}
+.note-name {
+  font-size: 4rem;
+  font-weight: 800;
+  color: var(--amber);
+  line-height: 1;
+  transition: color 0.3s;
+}
+.note-name.in-tune { color: var(--green-glow); text-shadow: 0 0 20px rgba(76,175,80,0.6); }
+.note-freq {
+  font-size: 0.9rem;
+  color: var(--text-dim);
+  margin-top: 2px;
+}
+.note-cents {
+  font-size: 1.4rem;
+  font-weight: 600;
+  margin-top: 4px;
+  color: var(--amber-dim);
+  transition: color 0.3s;
+}
+.note-cents.in-tune { color: var(--green); }
+
+.start-btn {
+  margin-top: 24px;
+  padding: 14px 40px;
+  font-size: 1rem;
+  font-weight: 600;
+  border: none;
+  border-radius: 50px;
+  background: linear-gradient(135deg, var(--amber), var(--amber-dim));
+  color: #111;
+  cursor: pointer;
+  transition: transform 0.15s, box-shadow 0.2s;
+}
+.start-btn:active { transform: scale(0.96); }
+.start-btn.listening {
+  background: linear-gradient(135deg, #c0392b, #922);
+}
+
+/* --- Chord Library --- */
+.chord-section {}
+.chord-root-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  justify-content: center;
+  margin-bottom: 16px;
+}
+.root-btn {
+  padding: 8px 12px;
+  border-radius: 6px;
+  border: 1px solid #444;
+  background: var(--bg3);
+  color: var(--text-dim);
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+.root-btn.active {
+  background: var(--amber);
+  color: #111;
+  border-color: var(--amber);
+}
+
+.chord-type-row {
+  display: flex;
+  gap: 6px;
+  justify-content: center;
+  margin-bottom: 20px;
+}
+.type-btn {
+  padding: 6px 16px;
+  border-radius: 20px;
+  border: 1px solid #444;
+  background: var(--bg3);
+  color: var(--text-dim);
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+.type-btn.active {
+  background: var(--amber-dim);
+  color: #fff;
+  border-color: var(--amber);
+}
+
+.chord-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
+  gap: 10px;
+  margin-bottom: 20px;
+}
+.chord-card {
+  background: var(--bg3);
+  border: 1px solid #333;
+  border-radius: var(--radius);
+  padding: 12px 8px;
+  text-align: center;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+.chord-card:hover, .chord-card.active {
+  border-color: var(--amber);
+  box-shadow: 0 0 12px rgba(212,160,53,0.15);
+}
+.chord-card .chord-label {
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--amber);
+}
+
+/* Chord detail */
+.chord-detail {
+  background: var(--bg2);
+  border: 1px solid #333;
+  border-radius: var(--radius);
+  padding: 20px;
+  text-align: center;
+  margin-bottom: 20px;
+}
+.chord-detail h2 {
+  font-size: 1.5rem;
+  color: var(--amber);
+  margin-bottom: 16px;
+}
+.chord-detail .play-chord-btn {
+  margin-top: 16px;
+  padding: 10px 30px;
+  border: 1px solid var(--amber);
+  background: transparent;
+  color: var(--amber);
+  border-radius: 50px;
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+.chord-detail .play-chord-btn:hover {
+  background: var(--amber);
+  color: #111;
+}
+
+/* Fretboard diagram */
+.fretboard-svg {
+  display: block;
+  margin: 0 auto;
+}
+
+/* Home link */
+.home-link {
+  position: fixed;
+  bottom: 1.25rem;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 0.8rem;
+  color: rgba(255,255,255,0.35);
+  text-decoration: none;
+  z-index: 10;
+  transition: color 0.2s;
+}
+.home-link:hover { color: rgba(255,255,255,0.7); }
+</style>
+</head>
+<body>
+
+<div class="tabs">
+  <button class="active" data-tab="tuner">Tuner</button>
+  <button data-tab="chords">Chord Library</button>
+</div>
+
+<div id="tuner-panel" class="panel active">
+  <div class="tuner-section">
+    <div class="tuning-select-wrap">
+      <label for="tuningSelect">Tuning:</label>
+      <select id="tuningSelect"></select>
+    </div>
+    <div class="string-indicators" id="stringIndicators"></div>
+
+    <div class="gauge-wrap">
+      <svg class="gauge-bg" viewBox="0 0 280 160" id="gaugeSvg">
+        <defs>
+          <linearGradient id="gaugeGrad" x1="0" y1="0" x2="1" y2="0">
+            <stop offset="0%" stop-color="#c0392b"/>
+            <stop offset="35%" stop-color="#e67e22"/>
+            <stop offset="50%" stop-color="#4caf50"/>
+            <stop offset="65%" stop-color="#e67e22"/>
+            <stop offset="100%" stop-color="#c0392b"/>
+          </linearGradient>
+        </defs>
+        <!-- Arc background -->
+        <path d="M30,145 A120,120 0 0,1 250,145" fill="none" stroke="#333" stroke-width="8" stroke-linecap="round"/>
+        <!-- Colored arc -->
+        <path d="M30,145 A120,120 0 0,1 250,145" fill="none" stroke="url(#gaugeGrad)" stroke-width="6" stroke-linecap="round" opacity="0.6"/>
+        <!-- Center tick marks -->
+        <line x1="140" y1="28" x2="140" y2="40" stroke="#4caf50" stroke-width="2" opacity="0.7"/>
+        <!-- flat/sharp labels -->
+        <text x="36" y="155" fill="#999" font-size="10" text-anchor="middle">flat</text>
+        <text x="244" y="155" fill="#999" font-size="10" text-anchor="middle">sharp</text>
+        <text x="140" y="155" fill="#666" font-size="9" text-anchor="middle">0</text>
+        <!-- Needle -->
+        <line id="needle" x1="140" y1="145" x2="140" y2="35" stroke="var(--amber)" stroke-width="2.5" stroke-linecap="round" transform="rotate(0,140,145)"/>
+        <circle cx="140" cy="145" r="6" fill="var(--amber)"/>
+      </svg>
+    </div>
+
+    <div class="note-display">
+      <div class="note-name" id="noteName">--</div>
+      <div class="note-freq" id="noteFreq">-- Hz</div>
+      <div class="note-cents" id="noteCents">-- cents</div>
+    </div>
+
+    <button class="start-btn" id="startBtn">Start Tuner</button>
+  </div>
+</div>
+
+<div id="chords-panel" class="panel">
+  <div class="chord-section">
+    <div class="chord-root-row" id="rootRow"></div>
+    <div class="chord-type-row" id="typeRow"></div>
+    <div class="chord-grid" id="chordGrid"></div>
+    <div class="chord-detail" id="chordDetail" style="display:none;">
+      <h2 id="chordTitle"></h2>
+      <div id="fretboardWrap"></div>
+      <button class="play-chord-btn" id="playChordBtn">Strum Chord</button>
+    </div>
+  </div>
+</div>
+
+<a href="../" class="home-link">&larr; All Apps</a>
+
+<script>
+// ======================== TABS ========================
+document.querySelectorAll('.tabs button').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.tabs button').forEach(b => b.classList.remove('active'));
+    document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+    btn.classList.add('active');
+    document.getElementById(btn.dataset.tab + '-panel').classList.add('active');
+  });
+});
+
+// ======================== TUNING DATA ========================
+const TUNINGS = {
+  'Standard (EADGBE)':  ['E2','A2','D3','G3','B3','E4'],
+  'Drop D':             ['D2','A2','D3','G3','B3','E4'],
+  'Open G':             ['D2','G2','D3','G3','B3','D4'],
+  'Open D':             ['D2','A2','D3','F#3','A3','D4'],
+  'DADGAD':             ['D2','A2','D3','G3','A3','D4']
+};
+
+const NOTE_NAMES = ['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'];
+
+function noteToFreq(note) {
+  const match = note.match(/^([A-G]#?)(\d)$/);
+  if (!match) return 0;
+  const idx = NOTE_NAMES.indexOf(match[1]);
+  const oct = parseInt(match[2]);
+  const midi = (oct + 1) * 12 + idx;
+  return 440 * Math.pow(2, (midi - 69) / 12);
+}
+
+function freqToNote(freq) {
+  const midi = 69 + 12 * Math.log2(freq / 440);
+  const rounded = Math.round(midi);
+  const cents = Math.round((midi - rounded) * 100);
+  const name = NOTE_NAMES[(rounded % 12 + 12) % 12];
+  const octave = Math.floor(rounded / 12) - 1;
+  return { name, octave, cents, midi: rounded, fullName: name + octave };
+}
+
+// Populate tuning selector
+const tuningSelect = document.getElementById('tuningSelect');
+Object.keys(TUNINGS).forEach(t => {
+  const o = document.createElement('option');
+  o.value = t; o.textContent = t;
+  tuningSelect.appendChild(o);
+});
+
+const stringInds = document.getElementById('stringIndicators');
+function renderStringIndicators() {
+  const strings = TUNINGS[tuningSelect.value];
+  stringInds.innerHTML = '';
+  strings.forEach(s => {
+    const d = document.createElement('div');
+    d.className = 'string-ind';
+    d.textContent = s.replace(/\d/, '');
+    d.dataset.note = s;
+    stringInds.appendChild(d);
+  });
+}
+tuningSelect.addEventListener('change', renderStringIndicators);
+renderStringIndicators();
+
+// ======================== TUNER ENGINE ========================
+let audioCtx, analyser, micStream, rafId;
+let isListening = false;
+const startBtn = document.getElementById('startBtn');
+const needle = document.getElementById('needle');
+const noteNameEl = document.getElementById('noteName');
+const noteFreqEl = document.getElementById('noteFreq');
+const noteCentsEl = document.getElementById('noteCents');
+
+startBtn.addEventListener('click', async () => {
+  if (isListening) {
+    stopListening();
+    return;
+  }
+  try {
+    audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    micStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    const source = audioCtx.createMediaStreamSource(micStream);
+    analyser = audioCtx.createAnalyser();
+    analyser.fftSize = 4096;
+    source.connect(analyser);
+    isListening = true;
+    startBtn.textContent = 'Stop';
+    startBtn.classList.add('listening');
+    detectPitch();
+  } catch (e) {
+    alert('Microphone access is required for the tuner.');
+  }
+});
+
+function stopListening() {
+  isListening = false;
+  if (rafId) cancelAnimationFrame(rafId);
+  if (micStream) micStream.getTracks().forEach(t => t.stop());
+  if (audioCtx) audioCtx.close();
+  startBtn.textContent = 'Start Tuner';
+  startBtn.classList.remove('listening');
+  noteNameEl.textContent = '--';
+  noteNameEl.classList.remove('in-tune');
+  noteFreqEl.textContent = '-- Hz';
+  noteCentsEl.textContent = '-- cents';
+  noteCentsEl.classList.remove('in-tune');
+  needle.setAttribute('transform', 'rotate(0,140,145)');
+  document.querySelectorAll('.string-ind').forEach(s => {
+    s.classList.remove('active', 'in-tune');
+  });
+}
+
+function autoCorrelate(buf, sampleRate) {
+  let size = buf.length;
+  let rms = 0;
+  for (let i = 0; i < size; i++) rms += buf[i] * buf[i];
+  rms = Math.sqrt(rms / size);
+  if (rms < 0.01) return -1;
+
+  // Trim silence from edges
+  let r1 = 0, r2 = size - 1;
+  const threshold = 0.2;
+  for (let i = 0; i < size / 2; i++) { if (Math.abs(buf[i]) < threshold) r1 = i; else break; }
+  for (let i = 1; i < size / 2; i++) { if (Math.abs(buf[size - i]) < threshold) r2 = size - i; else break; }
+  buf = buf.slice(r1, r2);
+  size = buf.length;
+
+  const c = new Float32Array(size);
+  for (let i = 0; i < size; i++) {
+    for (let j = 0; j < size - i; j++) {
+      c[i] += buf[j] * buf[j + i];
+    }
+  }
+
+  let d = 0;
+  while (c[d] > c[d + 1]) d++;
+
+  let maxVal = -1, maxPos = -1;
+  for (let i = d; i < size; i++) {
+    if (c[i] > maxVal) { maxVal = c[i]; maxPos = i; }
+  }
+
+  let t0 = maxPos;
+  // Parabolic interpolation
+  if (t0 > 0 && t0 < size - 1) {
+    const x1 = c[t0 - 1], x2 = c[t0], x3 = c[t0 + 1];
+    const a = (x1 + x3 - 2 * x2) / 2;
+    if (a !== 0) {
+      const shift = (x1 - x3) / (4 * a); // simplified
+      t0 = t0 + shift;
+    }
+  }
+
+  return sampleRate / t0;
+}
+
+function detectPitch() {
+  if (!isListening) return;
+  const buf = new Float32Array(analyser.fftSize);
+  analyser.getFloatTimeDomainData(buf);
+  const freq = autoCorrelate(buf, audioCtx.sampleRate);
+
+  if (freq > 50 && freq < 1200) {
+    const info = freqToNote(freq);
+    noteNameEl.textContent = info.name + info.octave;
+    noteFreqEl.textContent = freq.toFixed(1) + ' Hz';
+
+    const centsAbs = Math.abs(info.cents);
+    const sign = info.cents > 0 ? '+' : info.cents < 0 ? '' : '';
+    noteCentsEl.textContent = sign + info.cents + ' cents';
+
+    const inTune = centsAbs <= 5;
+    noteNameEl.classList.toggle('in-tune', inTune);
+    noteCentsEl.classList.toggle('in-tune', inTune);
+
+    // Needle rotation: -50 to +50 cents maps to -80 to +80 degrees
+    const clamped = Math.max(-50, Math.min(50, info.cents));
+    const angle = (clamped / 50) * 80;
+    needle.setAttribute('transform', `rotate(${angle},140,145)`);
+    needle.style.stroke = inTune ? 'var(--green-glow)' : 'var(--amber)';
+
+    // Highlight matching string
+    const strings = TUNINGS[tuningSelect.value];
+    document.querySelectorAll('.string-ind').forEach((s, i) => {
+      const sNote = strings[i].replace(/\d/, '');
+      const match = sNote === info.name;
+      s.classList.toggle('active', match && !inTune);
+      s.classList.toggle('in-tune', match && inTune);
+    });
+  }
+
+  rafId = requestAnimationFrame(detectPitch);
+}
+
+// ======================== CHORD LIBRARY ========================
+const ROOTS = ['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'];
+const TYPES = ['Major','Minor','7th'];
+
+// Chord voicings: [lowE, A, D, G, B, highE] (-1 = muted, 0 = open)
+const CHORD_DB = {
+  'C_Major':  [[-1,3,2,0,1,0], 0],
+  'C_Minor':  [[-1,3,1,0,1,-1], 0],
+  'C_7th':    [[-1,3,2,3,1,0], 0],
+  'C#_Major': [[-1,4,3,1,2,1], 1],
+  'C#_Minor': [[-1,4,2,1,2,-1], 1],
+  'C#_7th':   [[-1,4,3,4,2,1], 1],
+  'D_Major':  [[-1,-1,0,2,3,2], 0],
+  'D_Minor':  [[-1,-1,0,2,3,1], 0],
+  'D_7th':    [[-1,-1,0,2,1,2], 0],
+  'D#_Major': [[-1,-1,1,3,4,3], 1],
+  'D#_Minor': [[-1,-1,1,3,4,2], 1],
+  'D#_7th':   [[-1,-1,1,3,2,3], 1],
+  'E_Major':  [[0,2,2,1,0,0], 0],
+  'E_Minor':  [[0,2,2,0,0,0], 0],
+  'E_7th':    [[0,2,0,1,0,0], 0],
+  'F_Major':  [[1,3,3,2,1,1], 1],
+  'F_Minor':  [[1,3,3,1,1,1], 1],
+  'F_7th':    [[1,3,1,2,1,1], 1],
+  'F#_Major': [[2,4,4,3,2,2], 2],
+  'F#_Minor': [[2,4,4,2,2,2], 2],
+  'F#_7th':   [[2,4,2,3,2,2], 2],
+  'G_Major':  [[3,2,0,0,0,3], 0],
+  'G_Minor':  [[3,1,0,0,3,3], 0],
+  'G_7th':    [[3,2,0,0,0,1], 0],
+  'G#_Major': [[4,3,1,1,1,4], 1],
+  'G#_Minor': [[4,2,1,1,4,4], 1],
+  'G#_7th':   [[4,3,1,1,1,2], 1],
+  'A_Major':  [[-1,0,2,2,2,0], 0],
+  'A_Minor':  [[-1,0,2,2,1,0], 0],
+  'A_7th':    [[-1,0,2,0,2,0], 0],
+  'A#_Major': [[-1,1,3,3,3,1], 1],
+  'A#_Minor': [[-1,1,3,3,2,1], 1],
+  'A#_7th':   [[-1,1,3,1,3,1], 1],
+  'B_Major':  [[-1,2,4,4,4,2], 2],
+  'B_Minor':  [[-1,2,4,4,3,2], 2],
+  'B_7th':    [[-1,2,1,2,0,2], 0]
+};
+
+// Chord note frequencies for strumming
+const CHORD_FREQS = {};
+const STRING_OPEN = ['E2','A2','D3','G3','B3','E4'];
+function buildChordFreqs() {
+  for (const key in CHORD_DB) {
+    const [frets] = CHORD_DB[key];
+    const freqs = [];
+    frets.forEach((f, i) => {
+      if (f < 0) return;
+      const openFreq = noteToFreq(STRING_OPEN[i]);
+      freqs.push(openFreq * Math.pow(2, f / 12));
+    });
+    CHORD_FREQS[key] = freqs;
+  }
+}
+buildChordFreqs();
+
+// Render roots
+const rootRow = document.getElementById('rootRow');
+const typeRow = document.getElementById('typeRow');
+const chordGrid = document.getElementById('chordGrid');
+let selectedRoot = 'C';
+let selectedType = 'Major';
+
+ROOTS.forEach(r => {
+  const b = document.createElement('button');
+  b.className = 'root-btn' + (r === selectedRoot ? ' active' : '');
+  b.textContent = r;
+  b.addEventListener('click', () => {
+    selectedRoot = r;
+    rootRow.querySelectorAll('.root-btn').forEach(x => x.classList.remove('active'));
+    b.classList.add('active');
+    renderChordGrid();
+  });
+  rootRow.appendChild(b);
+});
+
+TYPES.forEach(t => {
+  const b = document.createElement('button');
+  b.className = 'type-btn' + (t === selectedType ? ' active' : '');
+  b.textContent = t;
+  b.addEventListener('click', () => {
+    selectedType = t;
+    typeRow.querySelectorAll('.type-btn').forEach(x => x.classList.remove('active'));
+    b.classList.add('active');
+    renderChordGrid();
+  });
+  typeRow.appendChild(b);
+});
+
+function renderChordGrid() {
+  chordGrid.innerHTML = '';
+  document.getElementById('chordDetail').style.display = 'none';
+
+  // Show all chords for the selected root, or all for the selected type
+  // We'll show: selected root with all types, then all roots with selected type
+  // Actually simpler: show the matching chord + neighbors
+  // Let's show all roots for the selected type as a grid
+  ROOTS.forEach(root => {
+    const key = root + '_' + selectedType;
+    if (!CHORD_DB[key]) return;
+    const card = document.createElement('div');
+    card.className = 'chord-card';
+    const suffix = selectedType === 'Major' ? '' : selectedType === 'Minor' ? 'm' : '7';
+    card.innerHTML = `<div class="chord-label">${root}${suffix}</div>`;
+    card.addEventListener('click', () => {
+      document.querySelectorAll('.chord-card').forEach(c => c.classList.remove('active'));
+      card.classList.add('active');
+      showChordDetail(root, selectedType);
+    });
+    chordGrid.appendChild(card);
+  });
+}
+renderChordGrid();
+
+function showChordDetail(root, type) {
+  const key = root + '_' + type;
+  const [frets, barFret] = CHORD_DB[key];
+  const suffix = type === 'Major' ? '' : type === 'Minor' ? 'm' : '7';
+  const detail = document.getElementById('chordDetail');
+  detail.style.display = 'block';
+  document.getElementById('chordTitle').textContent = root + suffix;
+
+  // Draw fretboard SVG
+  const wrap = document.getElementById('fretboardWrap');
+  wrap.innerHTML = '';
+
+  const svgW = 180, svgH = 220;
+  const padL = 30, padR = 20, padTop = 30, padBot = 20;
+  const strSpacing = (svgW - padL - padR) / 5;
+  const fretSpacing = (svgH - padTop - padBot) / 5;
+
+  // Determine fret range to display
+  const playedFrets = frets.filter(f => f > 0);
+  let minFret = playedFrets.length ? Math.min(...playedFrets) : 0;
+  let maxFret = playedFrets.length ? Math.max(...playedFrets) : 3;
+  let startFret = 0;
+  if (maxFret > 4) {
+    startFret = minFret - 1;
+    if (startFret < 1) startFret = 1;
+  }
+
+  let svg = `<svg class="fretboard-svg" width="${svgW}" height="${svgH}" viewBox="0 0 ${svgW} ${svgH}">`;
+
+  // Nut or fret number
+  if (startFret === 0) {
+    svg += `<rect x="${padL - 2}" y="${padTop - 2}" width="${strSpacing * 5 + 4}" height="4" rx="1" fill="#ddd"/>`;
+  } else {
+    svg += `<text x="${padL - 16}" y="${padTop + fretSpacing / 2 + 5}" fill="#999" font-size="12" text-anchor="middle">${startFret + 1}</text>`;
+  }
+
+  // Fret lines
+  for (let f = 0; f <= 5; f++) {
+    const y = padTop + f * fretSpacing;
+    svg += `<line x1="${padL}" y1="${y}" x2="${padL + strSpacing * 5}" y2="${y}" stroke="#555" stroke-width="${f === 0 ? 2 : 1}"/>`;
+  }
+
+  // String lines
+  for (let s = 0; s < 6; s++) {
+    const x = padL + s * strSpacing;
+    svg += `<line x1="${x}" y1="${padTop}" x2="${x}" y2="${padTop + fretSpacing * 5}" stroke="#888" stroke-width="${1 + (5 - s) * 0.3}"/>`;
+  }
+
+  // Barre indication
+  if (barFret > 0) {
+    const barY = padTop + (barFret - startFret - 0.5) * fretSpacing;
+    if (barY > padTop && barY < padTop + fretSpacing * 5) {
+      const first = frets.indexOf(barFret);
+      const last = frets.lastIndexOf(barFret);
+      if (last > first) {
+        svg += `<rect x="${padL + first * strSpacing - 6}" y="${barY - 7}" width="${(last - first) * strSpacing + 12}" height="14" rx="7" fill="var(--amber)" opacity="0.3"/>`;
+      }
+    }
+  }
+
+  // Dots & open/muted markers
+  frets.forEach((f, i) => {
+    const x = padL + i * strSpacing;
+    if (f < 0) {
+      svg += `<text x="${x}" y="${padTop - 10}" fill="#c0392b" font-size="14" text-anchor="middle" font-weight="700">x</text>`;
+    } else if (f === 0) {
+      svg += `<circle cx="${x}" cy="${padTop - 10}" r="5" fill="none" stroke="#aaa" stroke-width="1.5"/>`;
+    } else {
+      const dotY = padTop + (f - startFret - 0.5) * fretSpacing;
+      svg += `<circle cx="${x}" cy="${dotY}" r="8" fill="var(--amber)"/>`;
+      svg += `<text x="${x}" y="${dotY + 4}" fill="#111" font-size="10" text-anchor="middle" font-weight="700">${f}</text>`;
+    }
+  });
+
+  svg += '</svg>';
+  wrap.innerHTML = svg;
+
+  // Wire up play button
+  document.getElementById('playChordBtn').onclick = () => strumChord(key);
+}
+
+// ======================== CHORD PLAYBACK ========================
+let playCtx;
+function strumChord(key) {
+  const freqs = CHORD_FREQS[key];
+  if (!freqs || !freqs.length) return;
+  if (!playCtx) playCtx = new (window.AudioContext || window.webkitAudioContext)();
+  const now = playCtx.currentTime;
+
+  freqs.forEach((freq, i) => {
+    const delay = i * 0.05; // strum delay
+    const osc = playCtx.createOscillator();
+    const gain = playCtx.createGain();
+    const filter = playCtx.createBiquadFilter();
+
+    // Use a mix of harmonics for guitar-like sound
+    osc.type = 'triangle';
+    osc.frequency.setValueAtTime(freq, now + delay);
+
+    filter.type = 'lowpass';
+    filter.frequency.setValueAtTime(2000, now + delay);
+    filter.Q.setValueAtTime(1, now + delay);
+
+    gain.gain.setValueAtTime(0, now + delay);
+    gain.gain.linearRampToValueAtTime(0.15, now + delay + 0.01);
+    gain.gain.exponentialRampToValueAtTime(0.001, now + delay + 1.8);
+
+    osc.connect(filter);
+    filter.connect(gain);
+    gain.connect(playCtx.destination);
+
+    osc.start(now + delay);
+    osc.stop(now + delay + 2);
+
+    // Add a second harmonic for richness
+    const osc2 = playCtx.createOscillator();
+    const gain2 = playCtx.createGain();
+    osc2.type = 'sawtooth';
+    osc2.frequency.setValueAtTime(freq, now + delay);
+    gain2.gain.setValueAtTime(0, now + delay);
+    gain2.gain.linearRampToValueAtTime(0.03, now + delay + 0.01);
+    gain2.gain.exponentialRampToValueAtTime(0.001, now + delay + 1.2);
+    osc2.connect(filter);
+    osc2.start(now + delay);
+    osc2.stop(now + delay + 1.5);
+  });
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,650 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>Spirit Level + Measuring Suite</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg: #1a1a1a;
+    --surface: #242424;
+    --surface2: #2e2e2e;
+    --accent: #00c9a7;
+    --accent-dim: #00856e;
+    --green: #00e676;
+    --text: #e0e0e0;
+    --text-dim: rgba(255,255,255,0.45);
+    --radius: 12px;
+  }
+
+  html, body {
+    height: 100%;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    overflow: hidden;
+    touch-action: manipulation;
+    -webkit-user-select: none;
+    user-select: none;
+  }
+
+  /* Tab bar */
+  .tab-bar {
+    display: flex;
+    background: var(--surface);
+    border-bottom: 1px solid #333;
+    position: relative;
+    z-index: 5;
+  }
+  .tab-bar button {
+    flex: 1;
+    padding: 14px 8px;
+    background: none;
+    border: none;
+    color: var(--text-dim);
+    font-size: 0.85rem;
+    font-weight: 600;
+    letter-spacing: 0.03em;
+    text-transform: uppercase;
+    cursor: pointer;
+    transition: color 0.2s, border-color 0.2s;
+    border-bottom: 3px solid transparent;
+  }
+  .tab-bar button.active {
+    color: var(--accent);
+    border-bottom-color: var(--accent);
+  }
+  .tab-bar button:hover { color: var(--text); }
+
+  /* Panels */
+  .panel {
+    display: none;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    height: calc(100vh - 52px - 60px);
+    padding: 16px;
+    position: relative;
+  }
+  .panel.active { display: flex; }
+
+  /* Calibrate bar */
+  .calibrate-bar {
+    display: flex;
+    justify-content: center;
+    gap: 12px;
+    padding: 8px 16px;
+    background: var(--surface);
+    border-top: 1px solid #333;
+    position: fixed;
+    bottom: 48px;
+    left: 0; right: 0;
+    z-index: 5;
+  }
+  .calibrate-bar button {
+    padding: 8px 20px;
+    border: 1px solid var(--accent-dim);
+    border-radius: 8px;
+    background: var(--surface2);
+    color: var(--accent);
+    font-size: 0.8rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.2s;
+  }
+  .calibrate-bar button:hover { background: #383838; }
+  .calibrate-bar button:active { background: var(--accent-dim); color: #fff; }
+
+  /* Degree readout */
+  .deg-readout {
+    font-size: 3.2rem;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+    letter-spacing: -0.02em;
+    transition: color 0.15s;
+  }
+  .deg-readout.level-hit { color: var(--green); }
+
+  .axis-label {
+    font-size: 0.75rem;
+    color: var(--text-dim);
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    margin-bottom: 2px;
+  }
+  .axis-row {
+    display: flex;
+    gap: 32px;
+    text-align: center;
+    margin-top: 16px;
+  }
+
+  /* ===== Spirit Level ===== */
+  .level-container {
+    position: relative;
+    width: min(300px, 80vw);
+    height: min(300px, 80vw);
+  }
+  .level-ring {
+    width: 100%; height: 100%;
+    border-radius: 50%;
+    border: 3px solid var(--accent-dim);
+    background: radial-gradient(circle, #1e2e2a 0%, var(--surface) 80%);
+    position: relative;
+    overflow: hidden;
+  }
+  .level-ring.level-hit { border-color: var(--green); box-shadow: 0 0 20px rgba(0,230,118,0.25); }
+
+  .crosshair-h, .crosshair-v {
+    position: absolute;
+    background: rgba(0,201,167,0.15);
+  }
+  .crosshair-h { width: 100%; height: 1px; top: 50%; left: 0; }
+  .crosshair-v { height: 100%; width: 1px; left: 50%; top: 0; }
+
+  .level-target {
+    position: absolute;
+    width: 20px; height: 20px;
+    border: 2px solid rgba(0,201,167,0.3);
+    border-radius: 50%;
+    top: 50%; left: 50%;
+    transform: translate(-50%, -50%);
+  }
+
+  .bubble {
+    position: absolute;
+    width: 36px; height: 36px;
+    border-radius: 50%;
+    background: radial-gradient(circle at 35% 35%, var(--accent), #007a63);
+    box-shadow: 0 0 12px rgba(0,201,167,0.4);
+    top: 50%; left: 50%;
+    transform: translate(-50%, -50%);
+    transition: background 0.15s;
+  }
+  .bubble.level-hit {
+    background: radial-gradient(circle at 35% 35%, var(--green), #00a84d);
+    box-shadow: 0 0 20px rgba(0,230,118,0.5);
+  }
+
+  /* ===== Protractor ===== */
+  .protractor-wrap {
+    position: relative;
+    width: min(320px, 85vw);
+    height: min(320px, 85vw);
+  }
+  .protractor-canvas {
+    width: 100%; height: 100%;
+  }
+  .proto-deg {
+    font-size: 4.5rem;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+    margin-top: 12px;
+    transition: color 0.15s;
+  }
+  .proto-deg.level-hit { color: var(--green); }
+
+  /* ===== Plumb Bob ===== */
+  .plumb-wrap {
+    position: relative;
+    width: min(200px, 60vw);
+    height: min(400px, 65vh);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+  }
+  .plumb-canvas {
+    width: 100%; height: 100%;
+  }
+  .plumb-deg {
+    font-size: 3.5rem;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+    margin-top: 8px;
+    transition: color 0.15s;
+  }
+  .plumb-deg.level-hit { color: var(--green); }
+  .plumb-sub {
+    font-size: 0.8rem;
+    color: var(--text-dim);
+    margin-top: 4px;
+  }
+
+  /* Permission overlay */
+  .permission-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.85);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    z-index: 100;
+    padding: 24px;
+    text-align: center;
+  }
+  .permission-overlay.hidden { display: none; }
+  .permission-overlay h2 { margin-bottom: 12px; color: var(--accent); }
+  .permission-overlay p { margin-bottom: 20px; color: var(--text-dim); max-width: 320px; line-height: 1.5; }
+  .permission-overlay button {
+    padding: 14px 40px;
+    border: none;
+    border-radius: 10px;
+    background: var(--accent);
+    color: #111;
+    font-size: 1rem;
+    font-weight: 700;
+    cursor: pointer;
+  }
+
+  /* Home link */
+  .home-link {
+    position: fixed;
+    bottom: 1.25rem;
+    left: 50%;
+    transform: translateX(-50%);
+    font-size: 0.8rem;
+    color: rgba(255,255,255,0.35);
+    text-decoration: none;
+    z-index: 10;
+    transition: color 0.2s;
+  }
+  .home-link:hover { color: rgba(255,255,255,0.7); }
+
+  /* No sensor fallback */
+  .no-sensor {
+    text-align: center;
+    color: var(--text-dim);
+    padding: 40px 20px;
+    line-height: 1.6;
+  }
+  .no-sensor strong { color: var(--accent); }
+</style>
+</head>
+<body>
+
+<!-- Permission overlay for iOS 13+ -->
+<div class="permission-overlay hidden" id="permOverlay">
+  <h2>Sensor Access Required</h2>
+  <p>This app needs access to your device's motion sensors to function as a spirit level.</p>
+  <button id="permBtn">Enable Sensors</button>
+</div>
+
+<!-- Tab bar -->
+<div class="tab-bar">
+  <button class="active" data-tab="level">Level</button>
+  <button data-tab="protractor">Protractor</button>
+  <button data-tab="plumb">Plumb Bob</button>
+</div>
+
+<!-- Level panel -->
+<div class="panel active" id="panel-level">
+  <div class="level-container">
+    <div class="level-ring" id="levelRing">
+      <div class="crosshair-h"></div>
+      <div class="crosshair-v"></div>
+      <div class="level-target"></div>
+      <div class="bubble" id="bubble"></div>
+    </div>
+  </div>
+  <div class="axis-row">
+    <div>
+      <div class="axis-label">X Axis</div>
+      <div class="deg-readout" id="levelX">0.0&deg;</div>
+    </div>
+    <div>
+      <div class="axis-label">Y Axis</div>
+      <div class="deg-readout" id="levelY">0.0&deg;</div>
+    </div>
+  </div>
+</div>
+
+<!-- Protractor panel -->
+<div class="panel" id="panel-protractor">
+  <div class="protractor-wrap">
+    <canvas class="protractor-canvas" id="protoCanvas"></canvas>
+  </div>
+  <div class="proto-deg" id="protoDeg">0.0&deg;</div>
+</div>
+
+<!-- Plumb Bob panel -->
+<div class="panel" id="panel-plumb">
+  <div class="plumb-wrap">
+    <canvas class="plumb-canvas" id="plumbCanvas"></canvas>
+  </div>
+  <div class="plumb-deg" id="plumbDeg">0.0&deg;</div>
+  <div class="plumb-sub">deviation from vertical</div>
+</div>
+
+<!-- Calibrate bar -->
+<div class="calibrate-bar">
+  <button id="calibrateBtn">Calibrate</button>
+  <button id="resetBtn">Reset</button>
+</div>
+
+<a href="../" class="home-link">&larr; All Apps</a>
+
+<script>
+(function() {
+  // State
+  let currentTab = 'level';
+  let rawBeta = 0, rawGamma = 0, rawAlpha = 0;
+  let offsetBeta = 0, offsetGamma = 0;
+  let beta = 0, gamma = 0, alpha = 0;
+  let sensorAvailable = false;
+  let lastVibrateTime = 0;
+  const LEVEL_THRESH = 0.8;
+
+  // Elements
+  const bubble = document.getElementById('bubble');
+  const levelRing = document.getElementById('levelRing');
+  const levelX = document.getElementById('levelX');
+  const levelY = document.getElementById('levelY');
+  const protoDeg = document.getElementById('protoDeg');
+  const plumbDeg = document.getElementById('plumbDeg');
+  const protoCanvas = document.getElementById('protoCanvas');
+  const plumbCanvas = document.getElementById('plumbCanvas');
+  const permOverlay = document.getElementById('permOverlay');
+
+  // Tabs
+  document.querySelectorAll('.tab-bar button').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('.tab-bar button').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+      currentTab = btn.dataset.tab;
+      document.getElementById('panel-' + currentTab).classList.add('active');
+      if (currentTab === 'protractor') resizeProtoCanvas();
+      if (currentTab === 'plumb') resizePlumbCanvas();
+    });
+  });
+
+  // Calibration
+  document.getElementById('calibrateBtn').addEventListener('click', () => {
+    offsetBeta = rawBeta;
+    offsetGamma = rawGamma;
+  });
+  document.getElementById('resetBtn').addEventListener('click', () => {
+    offsetBeta = 0;
+    offsetGamma = 0;
+  });
+
+  // Permission handling (iOS 13+)
+  function requestPermission() {
+    if (typeof DeviceOrientationEvent !== 'undefined' &&
+        typeof DeviceOrientationEvent.requestPermission === 'function') {
+      permOverlay.classList.remove('hidden');
+      document.getElementById('permBtn').addEventListener('click', () => {
+        DeviceOrientationEvent.requestPermission().then(state => {
+          if (state === 'granted') {
+            permOverlay.classList.add('hidden');
+            startListening();
+          }
+        }).catch(console.error);
+      });
+    } else {
+      startListening();
+    }
+  }
+
+  function startListening() {
+    window.addEventListener('deviceorientation', onOrientation, true);
+    // Check if we actually get data after a short delay
+    setTimeout(() => {
+      if (!sensorAvailable) {
+        showFallback();
+      }
+    }, 1500);
+  }
+
+  function showFallback() {
+    document.querySelectorAll('.panel').forEach(p => {
+      if (!p.querySelector('.no-sensor')) {
+        const msg = document.createElement('div');
+        msg.className = 'no-sensor';
+        msg.innerHTML = '<strong>No motion sensor detected</strong><br>This app requires a device with accelerometer/gyroscope (phone or tablet). Open this page on a mobile device to use the spirit level.';
+        p.appendChild(msg);
+      }
+    });
+  }
+
+  function onOrientation(e) {
+    if (e.beta === null && e.gamma === null) return;
+    sensorAvailable = true;
+    rawBeta = e.beta || 0;   // front-back tilt (-180 to 180)
+    rawGamma = e.gamma || 0; // left-right tilt (-90 to 90)
+    rawAlpha = e.alpha || 0; // compass heading
+
+    beta = rawBeta - offsetBeta;
+    gamma = rawGamma - offsetGamma;
+  }
+
+  // Vibrate helper
+  function tryVibrate() {
+    const now = Date.now();
+    if (now - lastVibrateTime > 400 && navigator.vibrate) {
+      navigator.vibrate(30);
+      lastVibrateTime = now;
+    }
+  }
+
+  // Check if angle is near a "level" snap point (0 or 90)
+  function isLevelHit(deg) {
+    const a = Math.abs(deg);
+    return a < LEVEL_THRESH || Math.abs(a - 90) < LEVEL_THRESH || Math.abs(a - 180) < LEVEL_THRESH;
+  }
+
+  // ===== RENDER LOOP =====
+  function render() {
+    if (currentTab === 'level') renderLevel();
+    else if (currentTab === 'protractor') renderProtractor();
+    else if (currentTab === 'plumb') renderPlumb();
+    requestAnimationFrame(render);
+  }
+
+  // ===== LEVEL =====
+  function renderLevel() {
+    const clampX = Math.max(-45, Math.min(45, gamma));
+    const clampY = Math.max(-45, Math.min(45, beta));
+    const pctX = (clampX / 45) * 45; // % offset from center
+    const pctY = (clampY / 45) * 45;
+
+    bubble.style.left = (50 + pctX) + '%';
+    bubble.style.top = (50 + pctY) + '%';
+
+    const xHit = isLevelHit(gamma);
+    const yHit = isLevelHit(beta);
+    const bothHit = xHit && yHit;
+
+    levelRing.classList.toggle('level-hit', bothHit);
+    bubble.classList.toggle('level-hit', bothHit);
+    levelX.classList.toggle('level-hit', xHit);
+    levelY.classList.toggle('level-hit', yHit);
+
+    levelX.textContent = gamma.toFixed(1) + '\u00B0';
+    levelY.textContent = beta.toFixed(1) + '\u00B0';
+
+    if (bothHit) tryVibrate();
+  }
+
+  // ===== PROTRACTOR =====
+  function resizeProtoCanvas() {
+    const wrap = protoCanvas.parentElement;
+    const s = Math.min(wrap.clientWidth, wrap.clientHeight) || 300;
+    protoCanvas.width = s * 2;
+    protoCanvas.height = s * 2;
+    protoCanvas.style.width = s + 'px';
+    protoCanvas.style.height = s + 'px';
+  }
+
+  function renderProtractor() {
+    const c = protoCanvas;
+    const ctx = c.getContext('2d');
+    const w = c.width, h = c.height;
+    const cx = w / 2, cy = h / 2;
+    const r = w * 0.42;
+
+    ctx.clearRect(0, 0, w, h);
+
+    // Outer ring
+    ctx.beginPath();
+    ctx.arc(cx, cy, r, 0, Math.PI * 2);
+    ctx.strokeStyle = '#00856e';
+    ctx.lineWidth = 3;
+    ctx.stroke();
+
+    // Tick marks
+    for (let i = 0; i < 360; i += 5) {
+      const rad = (i - 90) * Math.PI / 180;
+      const isMajor = i % 30 === 0;
+      const isMid = i % 10 === 0;
+      const inner = isMajor ? r - 28 : (isMid ? r - 18 : r - 10);
+      ctx.beginPath();
+      ctx.moveTo(cx + Math.cos(rad) * inner, cy + Math.sin(rad) * inner);
+      ctx.lineTo(cx + Math.cos(rad) * r, cy + Math.sin(rad) * r);
+      ctx.strokeStyle = isMajor ? 'rgba(255,255,255,0.7)' : 'rgba(255,255,255,0.25)';
+      ctx.lineWidth = isMajor ? 2.5 : 1;
+      ctx.stroke();
+
+      if (isMajor) {
+        ctx.save();
+        ctx.translate(cx + Math.cos(rad) * (r - 40), cy + Math.sin(rad) * (r - 40));
+        ctx.fillStyle = 'rgba(255,255,255,0.5)';
+        ctx.font = '600 ' + (w * 0.035) + 'px sans-serif';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(i + '\u00B0', 0, 0);
+        ctx.restore();
+      }
+    }
+
+    // Current angle (use beta as main tilt when laying flat)
+    const angle = beta;
+    const aRad = (angle - 90) * Math.PI / 180;
+
+    // Needle
+    ctx.beginPath();
+    ctx.moveTo(cx, cy);
+    ctx.lineTo(cx + Math.cos(aRad) * (r - 6), cy + Math.sin(aRad) * (r - 6));
+    const hit = isLevelHit(angle);
+    ctx.strokeStyle = hit ? '#00e676' : '#00c9a7';
+    ctx.lineWidth = 4;
+    ctx.lineCap = 'round';
+    ctx.stroke();
+
+    // Center dot
+    ctx.beginPath();
+    ctx.arc(cx, cy, 8, 0, Math.PI * 2);
+    ctx.fillStyle = hit ? '#00e676' : '#00c9a7';
+    ctx.fill();
+
+    protoDeg.textContent = angle.toFixed(1) + '\u00B0';
+    protoDeg.classList.toggle('level-hit', hit);
+    if (hit) tryVibrate();
+  }
+
+  // ===== PLUMB BOB =====
+  function resizePlumbCanvas() {
+    const wrap = plumbCanvas.parentElement;
+    const w = wrap.clientWidth || 200;
+    const h = wrap.clientHeight || 400;
+    plumbCanvas.width = w * 2;
+    plumbCanvas.height = h * 2;
+    plumbCanvas.style.width = w + 'px';
+    plumbCanvas.style.height = h + 'px';
+  }
+
+  function renderPlumb() {
+    const c = plumbCanvas;
+    const ctx = c.getContext('2d');
+    const w = c.width, h = c.height;
+    const cx = w / 2;
+
+    ctx.clearRect(0, 0, w, h);
+
+    // Pivot point
+    const pivotY = 40;
+    const lineLen = h * 0.75;
+
+    // Deviation angle from vertical
+    const dev = Math.sqrt(gamma * gamma + (beta > 90 ? (180 - beta) * (180 - beta) : beta * beta));
+    const swingAngle = Math.atan2(gamma, beta < 90 ? beta : 180 - beta);
+
+    // Plumb line angle based on gamma (left-right tilt)
+    const tiltRad = (-gamma) * Math.PI / 180;
+    const endX = cx + Math.sin(tiltRad) * lineLen;
+    const endY = pivotY + Math.cos(tiltRad) * lineLen;
+
+    // Reference vertical (dashed)
+    ctx.beginPath();
+    ctx.setLineDash([8, 8]);
+    ctx.moveTo(cx, pivotY);
+    ctx.lineTo(cx, pivotY + lineLen + 20);
+    ctx.strokeStyle = 'rgba(255,255,255,0.12)';
+    ctx.lineWidth = 2;
+    ctx.stroke();
+    ctx.setLineDash([]);
+
+    // Angle arc
+    if (Math.abs(gamma) > 0.3) {
+      const arcR = 80;
+      const startA = Math.PI / 2;
+      const endA = Math.PI / 2 - tiltRad;
+      ctx.beginPath();
+      ctx.arc(cx, pivotY, arcR, Math.min(startA, endA), Math.max(startA, endA));
+      ctx.strokeStyle = 'rgba(0,201,167,0.4)';
+      ctx.lineWidth = 2;
+      ctx.stroke();
+    }
+
+    // Plumb line
+    const hit = Math.abs(gamma) < LEVEL_THRESH && Math.abs(beta) < LEVEL_THRESH;
+    ctx.beginPath();
+    ctx.moveTo(cx, pivotY);
+    ctx.lineTo(endX, endY);
+    ctx.strokeStyle = hit ? '#00e676' : '#00c9a7';
+    ctx.lineWidth = 3;
+    ctx.lineCap = 'round';
+    ctx.stroke();
+
+    // Pivot circle
+    ctx.beginPath();
+    ctx.arc(cx, pivotY, 8, 0, Math.PI * 2);
+    ctx.fillStyle = '#555';
+    ctx.fill();
+    ctx.strokeStyle = '#888';
+    ctx.lineWidth = 2;
+    ctx.stroke();
+
+    // Weight (bob)
+    ctx.beginPath();
+    ctx.moveTo(endX - 16, endY);
+    ctx.lineTo(endX, endY + 32);
+    ctx.lineTo(endX + 16, endY);
+    ctx.closePath();
+    ctx.fillStyle = hit ? '#00e676' : '#00c9a7';
+    ctx.fill();
+
+    // Deviation readout
+    const deviation = Math.abs(gamma);
+    plumbDeg.textContent = deviation.toFixed(1) + '\u00B0';
+    plumbDeg.classList.toggle('level-hit', hit);
+    if (hit) tryVibrate();
+  }
+
+  // Init
+  resizeProtoCanvas();
+  resizePlumbCanvas();
+  window.addEventListener('resize', () => {
+    resizeProtoCanvas();
+    resizePlumbCanvas();
+  });
+
+  requestPermission();
+  requestAnimationFrame(render);
+})();
+</script>
+</body>
+</html>
