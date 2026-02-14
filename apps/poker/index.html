@@ -954,9 +954,86 @@ window.APP_CHANGELOG = `
 <h4>Changes</h4>
 <ul>
 <li class="done">Initial build &mdash; calculator + hand trainer</li>
+<li class="done">Add Monkton Dad&rsquo;s Mode &mdash; bourbon blur</li>
 </ul>
 `;
 </script>
 <script src="../shared/menu.js"></script>
+
+<!-- Monkton Dad's Mode -->
+<style>
+body.bourbon-mode .mini-card .rank,
+body.bourbon-mode .mini-card .suit,
+body.bourbon-mode .pick-card .rank,
+body.bourbon-mode .pick-card .suit {
+  filter: blur(var(--bourbon-blur, 0px));
+  transition: filter 0.4s ease;
+}
+#bourbon-sip {
+  display: none;
+  position: fixed; bottom: 1.2rem; right: 1rem; z-index: 1500;
+  background: rgba(40, 25, 10, 0.85); border: 1px solid rgba(212,168,67,0.3);
+  border-radius: 2rem; padding: 0.4rem 0.8rem; cursor: pointer;
+  font-size: 0.95rem; color: #d4a843; user-select: none;
+  backdrop-filter: blur(6px); transition: transform 0.15s, box-shadow 0.3s;
+  box-shadow: 0 2px 12px rgba(0,0,0,0.3);
+}
+#bourbon-sip:active { transform: scale(0.92); }
+#bourbon-sip .sip-count {
+  font-weight: 800; font-size: 1rem; margin-right: 0.15rem;
+  font-variant-numeric: tabular-nums;
+}
+body.bourbon-mode #bourbon-sip { display: flex; align-items: center; gap: 0.3rem; }
+</style>
+<script>
+(function() {
+  // ---- State ----
+  var sips = 0;
+  var active = false;
+
+  // ---- Sip counter button (fixed, bottom-right) ----
+  var sipBtn = document.createElement('div');
+  sipBtn.id = 'bourbon-sip';
+  sipBtn.innerHTML = '<span class="sip-count">0</span>\uD83E\uDD43';
+  sipBtn.title = 'Take a sip';
+  document.body.appendChild(sipBtn);
+
+  sipBtn.addEventListener('click', function() {
+    sips++;
+    updateBlur();
+  });
+
+  // ---- Add toggle to the slide-out menu ----
+  var nav = document.querySelector('.app-menu-nav');
+  if (nav) {
+    var btn = document.createElement('button');
+    btn.textContent = '\uD83E\uDD43 Monkton Dad\u2019s Mode';
+    btn.style.cssText = 'opacity:0.6;font-size:0.8rem';
+    btn.addEventListener('click', function() {
+      active = !active;
+      if (active) {
+        document.body.classList.add('bourbon-mode');
+        btn.style.opacity = '1';
+        btn.style.color = '#d4a843';
+      } else {
+        document.body.classList.remove('bourbon-mode');
+        document.body.style.removeProperty('--bourbon-blur');
+        btn.style.opacity = '0.6';
+        btn.style.color = '';
+        sips = 0;
+      }
+      updateBlur();
+    });
+    nav.appendChild(btn);
+  }
+
+  function updateBlur() {
+    sipBtn.querySelector('.sip-count').textContent = sips;
+    // Non-linear curve: gentle at first, aggressive after sip 4-5
+    var px = sips === 0 ? 0 : Math.pow(sips, 1.5) * 0.5;
+    document.body.style.setProperty('--bourbon-blur', px.toFixed(1) + 'px');
+  }
+})();
+</script>
 </body>
 </html>
