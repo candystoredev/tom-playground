@@ -1,0 +1,628 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>Reflex Lab</title>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#0a0e17;--surface:#121926;--surface2:#1a2336;--border:#1e2d4a;
+  --cyan:#00e5ff;--cyan-dim:rgba(0,229,255,.15);--cyan-glow:rgba(0,229,255,.3);
+  --green:#00e676;--red:#ff1744;--amber:#ffab00;--purple:#b388ff;
+  --text:#e0e6f0;--text-dim:rgba(224,230,240,.5);
+  --radius:12px;
+}
+html,body{height:100%;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:var(--bg);color:var(--text);overflow-x:hidden;-webkit-tap-highlight-color:transparent}
+body{display:flex;flex-direction:column;min-height:100dvh;padding-bottom:3.5rem}
+
+/* Header */
+header{text-align:center;padding:1.25rem .75rem .75rem;flex-shrink:0}
+header h1{font-size:1.4rem;font-weight:700;letter-spacing:.04em;background:linear-gradient(135deg,var(--cyan),var(--purple));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
+header p{font-size:.75rem;color:var(--text-dim);margin-top:.2rem}
+
+/* Tabs */
+.tabs{display:flex;gap:4px;padding:0 .75rem;flex-shrink:0;overflow-x:auto;-webkit-overflow-scrolling:touch;scrollbar-width:none}
+.tabs::-webkit-scrollbar{display:none}
+.tab{flex:1;min-width:0;padding:.6rem .25rem;font-size:.68rem;font-weight:600;text-align:center;border:1px solid var(--border);border-radius:var(--radius);background:var(--surface);color:var(--text-dim);cursor:pointer;transition:all .2s;white-space:nowrap;user-select:none}
+.tab.active{background:var(--cyan-dim);color:var(--cyan);border-color:var(--cyan-glow);box-shadow:0 0 16px rgba(0,229,255,.1)}
+.tab:not(.active):active{background:var(--surface2)}
+
+/* Main area */
+main{flex:1;display:flex;flex-direction:column;padding:.75rem;overflow:hidden}
+.game-area{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;position:relative;border-radius:var(--radius);overflow:hidden;min-height:0}
+
+/* Panels */
+.panel{display:none;flex-direction:column;align-items:center;justify-content:center;width:100%;height:100%;gap:1rem}
+.panel.active{display:flex}
+
+/* Buttons */
+.btn{display:inline-flex;align-items:center;justify-content:center;padding:.75rem 1.75rem;border:none;border-radius:var(--radius);font-size:1rem;font-weight:600;cursor:pointer;transition:all .15s;user-select:none}
+.btn-primary{background:var(--cyan);color:#0a0e17}
+.btn-primary:active{transform:scale(.96);filter:brightness(1.1)}
+.btn-secondary{background:var(--surface2);color:var(--text);border:1px solid var(--border)}
+
+/* Result display */
+.result-big{font-size:3.5rem;font-weight:800;font-variant-numeric:tabular-nums;line-height:1;text-align:center}
+.result-unit{font-size:1rem;font-weight:400;color:var(--text-dim)}
+.result-label{font-size:.8rem;color:var(--text-dim);margin-top:.25rem}
+
+/* Stats bar */
+.stats-bar{display:flex;gap:.75rem;justify-content:center;flex-wrap:wrap;margin-top:.5rem}
+.stat-item{text-align:center}
+.stat-value{font-size:1.1rem;font-weight:700;font-variant-numeric:tabular-nums}
+.stat-label{font-size:.6rem;color:var(--text-dim);text-transform:uppercase;letter-spacing:.05em}
+
+/* Chart */
+.chart-container{width:100%;max-width:400px;margin-top:.75rem}
+.chart-container svg{width:100%;height:60px;display:block}
+
+/* Simple Reaction */
+#simple-zone{width:100%;height:100%;border-radius:var(--radius);display:flex;align-items:center;justify-content:center;cursor:pointer;user-select:none;transition:background .15s}
+#simple-zone.waiting{background:#b71c1c}
+#simple-zone.ready{background:#1b5e20;animation:pulse-green .6s ease infinite alternate}
+#simple-zone.too-early{background:#e65100}
+#simple-zone.idle{background:var(--surface)}
+@keyframes pulse-green{to{background:#2e7d32}}
+#simple-zone .zone-text{font-size:1.3rem;font-weight:600;pointer-events:none;text-align:center;padding:1rem}
+
+/* Choice Reaction */
+.choice-grid{display:grid;grid-template-columns:1fr 1fr;gap:1rem;width:100%;max-width:300px}
+.choice-circle{aspect-ratio:1;border-radius:50%;cursor:pointer;transition:all .2s;opacity:.3;border:3px solid transparent}
+.choice-circle.lit{opacity:1;transform:scale(1.1);box-shadow:0 0 30px currentColor}
+.choice-circle:active{transform:scale(.95)}
+.choice-circle[data-color="red"]{background:#ef5350;color:#ef5350}
+.choice-circle[data-color="blue"]{background:#42a5f5;color:#42a5f5}
+.choice-circle[data-color="green"]{background:#66bb6a;color:#66bb6a}
+.choice-circle[data-color="yellow"]{background:#ffee58;color:#ffee58}
+
+/* Sequence Memory */
+.seq-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:.6rem;width:100%;max-width:280px}
+.seq-tile{aspect-ratio:1;border-radius:var(--radius);background:var(--surface2);border:2px solid var(--border);cursor:pointer;transition:all .15s;user-select:none}
+.seq-tile.flash{background:var(--cyan)!important;border-color:var(--cyan)!important;box-shadow:0 0 20px var(--cyan-glow)}
+.seq-tile:active:not(.disabled){transform:scale(.93)}
+.seq-tile.correct-flash{background:var(--green)!important;border-color:var(--green)!important}
+.seq-tile.wrong-flash{background:var(--red)!important;border-color:var(--red)!important}
+
+/* Aim Trainer */
+#aim-field{position:relative;width:100%;height:100%;border-radius:var(--radius);background:var(--surface);overflow:hidden}
+.aim-target{position:absolute;border-radius:50%;background:var(--cyan);cursor:pointer;animation:target-in .15s ease-out;box-shadow:0 0 20px var(--cyan-glow);transition:transform .08s}
+.aim-target:active{transform:scale(.9)}
+@keyframes target-in{from{transform:scale(0);opacity:0}to{transform:scale(1);opacity:1}}
+.aim-hud{position:absolute;top:.75rem;left:.75rem;right:.75rem;display:flex;justify-content:space-between;pointer-events:none;font-size:.85rem;font-weight:600;font-variant-numeric:tabular-nums}
+
+/* Daily Challenge */
+.daily-banner{background:linear-gradient(135deg,rgba(0,229,255,.08),rgba(179,136,255,.08));border:1px solid var(--border);border-radius:var(--radius);padding:.75rem;text-align:center;width:100%;max-width:400px}
+.daily-banner h3{font-size:.9rem;color:var(--cyan);margin-bottom:.25rem}
+.daily-banner p{font-size:.75rem;color:var(--text-dim)}
+
+/* Animations */
+@keyframes fade-in{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+.fade-in{animation:fade-in .3s ease-out}
+
+/* Home link */
+.home-link{position:fixed;bottom:1.25rem;left:50%;transform:translateX(-50%);font-size:.8rem;color:rgba(255,255,255,.35);text-decoration:none;z-index:10;transition:color .2s}
+.home-link:hover{color:rgba(255,255,255,.7)}
+
+/* Scrollbar */
+::-webkit-scrollbar{width:4px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:var(--border);border-radius:2px}
+</style>
+</head>
+<body>
+
+<header>
+  <h1>REFLEX LAB</h1>
+  <p>Test &amp; train your reaction speed</p>
+</header>
+
+<div class="tabs" id="tabs">
+  <div class="tab active" data-mode="simple">Simple</div>
+  <div class="tab" data-mode="choice">Choice</div>
+  <div class="tab" data-mode="sequence">Sequence</div>
+  <div class="tab" data-mode="aim">Aim</div>
+  <div class="tab" data-mode="daily">Daily</div>
+</div>
+
+<main>
+  <div class="game-area" id="game-area">
+
+    <!-- Simple Reaction -->
+    <div class="panel active" id="panel-simple">
+      <div id="simple-zone" class="idle">
+        <div class="zone-text">Tap to start</div>
+      </div>
+    </div>
+
+    <!-- Choice Reaction -->
+    <div class="panel" id="panel-choice">
+      <div id="choice-status" class="result-label" style="font-size:1rem;margin-bottom:.5rem">Tap Start to begin</div>
+      <div class="choice-grid" id="choice-grid">
+        <div class="choice-circle" data-color="red"></div>
+        <div class="choice-circle" data-color="blue"></div>
+        <div class="choice-circle" data-color="green"></div>
+        <div class="choice-circle" data-color="yellow"></div>
+      </div>
+      <div id="choice-result" style="margin-top:1rem;text-align:center"></div>
+      <button class="btn btn-primary" id="choice-start" style="margin-top:.75rem">Start</button>
+    </div>
+
+    <!-- Sequence Memory -->
+    <div class="panel" id="panel-sequence">
+      <div id="seq-status" style="font-size:1rem;font-weight:600;margin-bottom:.5rem">Tap Start to begin</div>
+      <div class="seq-grid" id="seq-grid">
+        <div class="seq-tile" data-idx="0"></div>
+        <div class="seq-tile" data-idx="1"></div>
+        <div class="seq-tile" data-idx="2"></div>
+        <div class="seq-tile" data-idx="3"></div>
+        <div class="seq-tile" data-idx="4"></div>
+        <div class="seq-tile" data-idx="5"></div>
+        <div class="seq-tile" data-idx="6"></div>
+        <div class="seq-tile" data-idx="7"></div>
+        <div class="seq-tile" data-idx="8"></div>
+      </div>
+      <div id="seq-result" style="margin-top:1rem;text-align:center"></div>
+      <button class="btn btn-primary" id="seq-start" style="margin-top:.75rem">Start</button>
+    </div>
+
+    <!-- Aim Trainer -->
+    <div class="panel" id="panel-aim">
+      <div id="aim-field" style="display:none">
+        <div class="aim-hud">
+          <span id="aim-timer">30.0s</span>
+          <span id="aim-score">0 hits</span>
+        </div>
+      </div>
+      <div id="aim-idle">
+        <div style="text-align:center">
+          <p style="font-size:1rem;font-weight:600;margin-bottom:.5rem">Aim Trainer</p>
+          <p style="font-size:.8rem;color:var(--text-dim);margin-bottom:1rem">Hit targets as fast as possible in 30 seconds</p>
+          <div id="aim-result"></div>
+          <button class="btn btn-primary" id="aim-start" style="margin-top:.75rem">Start</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Daily Challenge -->
+    <div class="panel" id="panel-daily">
+      <div class="daily-banner">
+        <h3 id="daily-title">Daily Challenge</h3>
+        <p id="daily-desc">Loading...</p>
+      </div>
+      <div id="daily-result" style="margin-top:1rem;text-align:center"></div>
+      <button class="btn btn-primary" id="daily-start" style="margin-top:1rem">Start Challenge</button>
+    </div>
+
+  </div>
+</main>
+
+<a href="../" class="home-link">&larr; All Apps</a>
+
+<script>
+// ── Storage ──
+const STORAGE_KEY = 'reflex-lab-data';
+function loadData(){try{return JSON.parse(localStorage.getItem(STORAGE_KEY))||{}}catch(e){return{}}}
+function saveData(d){localStorage.setItem(STORAGE_KEY,JSON.stringify(d))}
+function getHistory(mode){const d=loadData();return d[mode]||[]}
+function addResult(mode,value){
+  const d=loadData();
+  if(!d[mode])d[mode]=[];
+  d[mode].push({value,time:Date.now()});
+  if(d[mode].length>100)d[mode]=d[mode].slice(-100);
+  saveData(d);
+}
+function getBest(mode){const h=getHistory(mode);if(!h.length)return null;const isLower=mode==='simple'||mode==='choice';return h.reduce((b,x)=>isLower?Math.min(b,x.value):Math.max(b,x.value),isLower?Infinity:-Infinity)}
+function getAvg10(mode){const h=getHistory(mode).slice(-10);if(!h.length)return null;return Math.round(h.reduce((s,x)=>s+x.value,0)/h.length)}
+function getLast20(mode){return getHistory(mode).slice(-20).map(x=>x.value)}
+
+// ── Tabs ──
+const tabs=document.querySelectorAll('.tab');
+const panels=document.querySelectorAll('.panel');
+let currentMode='simple';
+
+tabs.forEach(tab=>{
+  tab.addEventListener('click',()=>{
+    const mode=tab.dataset.mode;
+    if(mode===currentMode)return;
+    stopAll();
+    currentMode=mode;
+    tabs.forEach(t=>t.classList.toggle('active',t===tab));
+    panels.forEach(p=>p.classList.toggle('active',p.id==='panel-'+mode));
+    if(mode==='daily')setupDaily();
+  });
+});
+
+function stopAll(){
+  simpleReset();choiceReset();seqReset();aimStop();
+}
+
+// ── SVG Chart ──
+function renderChart(containerId,mode){
+  const vals=getLast20(mode);
+  if(!vals.length)return;
+  const container=document.getElementById(containerId);
+  if(!container)return;
+  const w=400,h=60,pad=4;
+  const max=Math.max(...vals),min=Math.min(...vals);
+  const range=max-min||1;
+  const barW=Math.max(4,(w-pad*2)/vals.length-2);
+  const isLower=mode==='simple'||mode==='choice';
+  let bars='';
+  vals.forEach((v,i)=>{
+    const norm=(v-min)/range;
+    const barH=Math.max(3,norm*(h-pad*2));
+    const x=pad+i*((w-pad*2)/vals.length)+(((w-pad*2)/vals.length-barW)/2);
+    const y=h-pad-barH;
+    const isLast=i===vals.length-1;
+    const fill=isLast?'rgba(0,229,255,1)':'rgba(0,229,255,0.35)';
+    bars+=`<rect x="${x}" y="${y}" width="${barW}" height="${barH}" rx="2" fill="${fill}"/>`;
+  });
+  container.innerHTML=`<div class="chart-container"><svg viewBox="0 0 ${w} ${h}" preserveAspectRatio="none">${bars}</svg></div>`;
+}
+
+function showStats(parentEl,mode,value,unit){
+  const best=getBest(mode);
+  const avg=getAvg10(mode);
+  const isLower=mode==='simple'||mode==='choice';
+  const bestLabel=isLower?'Best':'Best';
+  parentEl.innerHTML=`
+    <div class="fade-in" style="display:flex;flex-direction:column;align-items:center;gap:.5rem;">
+      <div class="result-big" style="color:var(--cyan)">${value}<span class="result-unit"> ${unit}</span></div>
+      <div class="stats-bar">
+        <div class="stat-item"><div class="stat-value" style="color:var(--green)">${best!==null?best:'--'}</div><div class="stat-label">${bestLabel}</div></div>
+        <div class="stat-item"><div class="stat-value">${avg!==null?avg:'--'}</div><div class="stat-label">Avg (10)</div></div>
+      </div>
+      <div id="chart-${mode}"></div>
+    </div>`;
+  renderChart('chart-'+mode,mode);
+}
+
+// ── Simple Reaction ──
+const simpleZone=document.getElementById('simple-zone');
+let simpleState='idle',simpleTimer=null,simpleStart=0;
+
+function simpleReset(){
+  clearTimeout(simpleTimer);
+  simpleState='idle';
+  simpleZone.className='idle';
+  simpleZone.querySelector('.zone-text').textContent='Tap to start';
+}
+
+simpleZone.addEventListener('click',()=>{
+  if(simpleState==='idle'){
+    simpleState='waiting';
+    simpleZone.className='waiting';
+    simpleZone.querySelector('.zone-text').textContent='Wait for green...';
+    const delay=2000+Math.random()*4000;
+    simpleTimer=setTimeout(()=>{
+      simpleState='ready';
+      simpleZone.className='ready';
+      simpleZone.querySelector('.zone-text').textContent='TAP NOW!';
+      simpleStart=performance.now();
+    },delay);
+  } else if(simpleState==='waiting'){
+    clearTimeout(simpleTimer);
+    simpleState='too-early';
+    simpleZone.className='too-early';
+    simpleZone.querySelector('.zone-text').textContent='Too early! Tap to retry';
+    setTimeout(()=>{simpleState='idle';simpleZone.className='idle';simpleZone.querySelector('.zone-text').textContent='Tap to start'},1500);
+  } else if(simpleState==='ready'){
+    const ms=Math.round(performance.now()-simpleStart);
+    addResult('simple',ms);
+    simpleState='idle';
+    simpleZone.className='idle';
+    simpleZone.querySelector('.zone-text').innerHTML='';
+    showStats(simpleZone.querySelector('.zone-text'),'simple',ms,'ms');
+    setTimeout(()=>{
+      if(simpleState==='idle'&&simpleZone.className==='idle'){
+        const zt=simpleZone.querySelector('.zone-text');
+        if(zt&&zt.querySelector('.result-big')){
+          // keep result showing, add hint
+          const hint=document.createElement('div');
+          hint.style.cssText='font-size:.75rem;color:var(--text-dim);margin-top:.5rem';
+          hint.textContent='Tap to try again';
+          zt.querySelector('.fade-in').appendChild(hint);
+        }
+      }
+    },500);
+  }
+});
+
+// ── Choice Reaction ──
+const choiceGrid=document.getElementById('choice-grid');
+const choiceCircles=choiceGrid.querySelectorAll('.choice-circle');
+const choiceStatus=document.getElementById('choice-status');
+const choiceResult=document.getElementById('choice-result');
+const choiceStartBtn=document.getElementById('choice-start');
+const colors=['red','blue','green','yellow'];
+let choiceRunning=false,choiceRound=0,choiceTotalTime=0,choiceCorrect=0,choiceTotal=0,choiceTimer=null,choiceLitColor=null,choiceLitTime=0;
+const CHOICE_ROUNDS=10;
+
+function choiceReset(){
+  choiceRunning=false;clearTimeout(choiceTimer);
+  choiceCircles.forEach(c=>c.classList.remove('lit'));
+  choiceStatus.textContent='Tap Start to begin';
+  choiceStartBtn.style.display='';
+  choiceResult.innerHTML='';
+  choiceLitColor=null;
+}
+
+choiceStartBtn.addEventListener('click',()=>{
+  choiceStartBtn.style.display='none';
+  choiceResult.innerHTML='';
+  choiceRunning=true;choiceRound=0;choiceTotalTime=0;choiceCorrect=0;choiceTotal=CHOICE_ROUNDS;
+  nextChoiceRound();
+});
+
+function nextChoiceRound(){
+  if(choiceRound>=CHOICE_ROUNDS){endChoice();return}
+  choiceCircles.forEach(c=>c.classList.remove('lit'));
+  choiceStatus.textContent=`Round ${choiceRound+1}/${CHOICE_ROUNDS}`;
+  choiceLitColor=null;
+  const delay=800+Math.random()*1500;
+  choiceTimer=setTimeout(()=>{
+    const idx=Math.floor(Math.random()*4);
+    choiceLitColor=colors[idx];
+    choiceCircles.forEach(c=>{c.classList.toggle('lit',c.dataset.color===choiceLitColor)});
+    choiceLitTime=performance.now();
+  },delay);
+}
+
+choiceCircles.forEach(c=>{
+  c.addEventListener('click',()=>{
+    if(!choiceRunning||!choiceLitColor)return;
+    const ms=performance.now()-choiceLitTime;
+    if(c.dataset.color===choiceLitColor){choiceCorrect++;choiceTotalTime+=ms}
+    choiceCircles.forEach(cc=>cc.classList.remove('lit'));
+    choiceLitColor=null;
+    choiceRound++;
+    setTimeout(nextChoiceRound,300);
+  });
+});
+
+function endChoice(){
+  choiceRunning=false;
+  choiceCircles.forEach(c=>c.classList.remove('lit'));
+  const avgMs=choiceCorrect>0?Math.round(choiceTotalTime/choiceCorrect):0;
+  const accuracy=Math.round(choiceCorrect/choiceTotal*100);
+  addResult('choice',avgMs||999);
+  choiceStatus.textContent='Done!';
+  choiceResult.innerHTML='';
+  showStats(choiceResult,'choice',avgMs||'--','ms');
+  const accDiv=document.createElement('div');
+  accDiv.style.cssText='margin-top:.5rem;font-size:.85rem;color:var(--text-dim)';
+  accDiv.textContent=`Accuracy: ${accuracy}% (${choiceCorrect}/${choiceTotal})`;
+  choiceResult.querySelector('.fade-in').appendChild(accDiv);
+  choiceStartBtn.textContent='Retry';
+  choiceStartBtn.style.display='';
+}
+
+// ── Sequence Memory ──
+const seqGrid=document.getElementById('seq-grid');
+const seqTiles=seqGrid.querySelectorAll('.seq-tile');
+const seqStatus=document.getElementById('seq-status');
+const seqResult=document.getElementById('seq-result');
+const seqStartBtn=document.getElementById('seq-start');
+let seqRunning=false,seqSequence=[],seqPlayerIdx=0,seqLevel=0,seqShowingFlag=false;
+
+function seqReset(){
+  seqRunning=false;seqShowingFlag=false;
+  seqTiles.forEach(t=>{t.className='seq-tile';t.classList.remove('disabled')});
+  seqStatus.textContent='Tap Start to begin';
+  seqStartBtn.style.display='';
+  seqResult.innerHTML='';
+}
+
+seqStartBtn.addEventListener('click',()=>{
+  seqStartBtn.style.display='none';
+  seqResult.innerHTML='';
+  seqSequence=[];seqLevel=0;seqRunning=true;
+  nextSeqLevel();
+});
+
+function nextSeqLevel(){
+  seqLevel++;
+  seqSequence.push(Math.floor(Math.random()*9));
+  seqStatus.textContent=`Level ${seqLevel} — Watch!`;
+  seqShowingFlag=true;
+  showSequence(0);
+}
+
+function showSequence(i){
+  if(i>=seqSequence.length){
+    seqShowingFlag=false;
+    seqPlayerIdx=0;
+    seqStatus.textContent=`Level ${seqLevel} — Your turn!`;
+    return;
+  }
+  setTimeout(()=>{
+    seqTiles[seqSequence[i]].classList.add('flash');
+    setTimeout(()=>{
+      seqTiles[seqSequence[i]].classList.remove('flash');
+      setTimeout(()=>showSequence(i+1),150);
+    },400);
+  },300);
+}
+
+seqTiles.forEach((tile,idx)=>{
+  tile.addEventListener('click',()=>{
+    if(!seqRunning||seqShowingFlag)return;
+    if(idx===seqSequence[seqPlayerIdx]){
+      tile.classList.add('correct-flash');
+      setTimeout(()=>tile.classList.remove('correct-flash'),200);
+      seqPlayerIdx++;
+      if(seqPlayerIdx>=seqSequence.length){
+        setTimeout(nextSeqLevel,600);
+      }
+    } else {
+      tile.classList.add('wrong-flash');
+      setTimeout(()=>tile.classList.remove('wrong-flash'),400);
+      seqRunning=false;
+      const score=seqLevel-1;
+      addResult('sequence',score);
+      seqStatus.textContent='Wrong!';
+      showStats(seqResult,'sequence',score,'lvl');
+      seqStartBtn.textContent='Retry';
+      seqStartBtn.style.display='';
+    }
+  });
+});
+
+// ── Aim Trainer ──
+const aimField=document.getElementById('aim-field');
+const aimIdle=document.getElementById('aim-idle');
+const aimTimerEl=document.getElementById('aim-timer');
+const aimScoreEl=document.getElementById('aim-score');
+const aimStartBtn=document.getElementById('aim-start');
+const aimResultEl=document.getElementById('aim-result');
+const AIM_DURATION=30000;
+const TARGET_SIZE=50;
+let aimRunning=false,aimHits=0,aimTotalTime=0,aimTargetTime=0,aimInterval=null,aimEnd=0;
+
+function aimStop(){
+  aimRunning=false;clearInterval(aimInterval);
+  aimField.style.display='none';aimIdle.style.display='';
+  aimField.querySelectorAll('.aim-target').forEach(t=>t.remove());
+}
+
+aimStartBtn.addEventListener('click',()=>{
+  aimResultEl.innerHTML='';
+  aimIdle.style.display='none';
+  aimField.style.display='';
+  aimRunning=true;aimHits=0;aimTotalTime=0;
+  aimEnd=Date.now()+AIM_DURATION;
+  spawnTarget();
+  aimInterval=setInterval(()=>{
+    const left=Math.max(0,aimEnd-Date.now());
+    aimTimerEl.textContent=(left/1000).toFixed(1)+'s';
+    aimScoreEl.textContent=aimHits+' hits';
+    if(left<=0)endAim();
+  },50);
+});
+
+function spawnTarget(){
+  aimField.querySelectorAll('.aim-target').forEach(t=>t.remove());
+  if(!aimRunning)return;
+  const rect=aimField.getBoundingClientRect();
+  const maxX=rect.width-TARGET_SIZE-10;
+  const maxY=rect.height-TARGET_SIZE-40;
+  const x=10+Math.random()*Math.max(0,maxX);
+  const y=35+Math.random()*Math.max(0,maxY);
+  const target=document.createElement('div');
+  target.className='aim-target';
+  target.style.cssText=`width:${TARGET_SIZE}px;height:${TARGET_SIZE}px;left:${x}px;top:${y}px`;
+  target.addEventListener('click',()=>{
+    if(!aimRunning)return;
+    const ms=performance.now()-aimTargetTime;
+    aimHits++;aimTotalTime+=ms;
+    target.remove();
+    spawnTarget();
+  });
+  aimField.appendChild(target);
+  aimTargetTime=performance.now();
+}
+
+function endAim(){
+  aimRunning=false;clearInterval(aimInterval);
+  aimField.querySelectorAll('.aim-target').forEach(t=>t.remove());
+  aimField.style.display='none';aimIdle.style.display='';
+  const avgMs=aimHits>0?Math.round(aimTotalTime/aimHits):0;
+  addResult('aim',aimHits);
+  showStats(aimResultEl,'aim',aimHits,'hits');
+  const avgDiv=document.createElement('div');
+  avgDiv.style.cssText='margin-top:.5rem;font-size:.85rem;color:var(--text-dim)';
+  avgDiv.textContent=`Avg per target: ${avgMs}ms`;
+  aimResultEl.querySelector('.fade-in').appendChild(avgDiv);
+  aimStartBtn.textContent='Retry';
+}
+
+// ── Daily Challenge ──
+const dailyTitle=document.getElementById('daily-title');
+const dailyDesc=document.getElementById('daily-desc');
+const dailyStartBtn=document.getElementById('daily-start');
+const dailyResult=document.getElementById('daily-result');
+
+function getDailySeed(){
+  const d=new Date();
+  return d.getFullYear()*10000+(d.getMonth()+1)*100+d.getDate();
+}
+function seededRandom(seed){let s=seed;return()=>{s=s*16807%2147483647;return(s-1)/2147483646}}
+
+const dailyModes=['simple','choice','sequence','aim'];
+const dailyConfigs={
+  simple:{name:'Simple Reaction',desc:'React as fast as you can when the screen turns green!',unit:'ms'},
+  choice:{name:'Choice Reaction',desc:'Tap the correct colored circle when it lights up!',unit:'ms'},
+  sequence:{name:'Sequence Memory',desc:'Remember and repeat the sequence of tiles!',unit:'lvl'},
+  aim:{name:'Aim Trainer',desc:'Hit as many targets as possible in 30 seconds!',unit:'hits'}
+};
+
+let dailyMode=null;
+
+function setupDaily(){
+  const seed=getDailySeed();
+  const rng=seededRandom(seed);
+  const idx=Math.floor(rng()*dailyModes.length);
+  dailyMode=dailyModes[idx];
+  const cfg=dailyConfigs[dailyMode];
+  const dateStr=new Date().toLocaleDateString('en-US',{weekday:'long',month:'short',day:'numeric'});
+  dailyTitle.textContent=`Daily Challenge — ${dateStr}`;
+  dailyDesc.textContent=`Today: ${cfg.name} — ${cfg.desc}`;
+  dailyResult.innerHTML='';
+
+  // Check if already completed today
+  const d=loadData();
+  const todayKey='daily-'+seed;
+  if(d[todayKey]){
+    const v=d[todayKey].value;
+    showStats(dailyResult,'daily-history',v,cfg.unit);
+    const done=document.createElement('div');
+    done.style.cssText='font-size:.75rem;color:var(--green);margin-top:.5rem';
+    done.textContent='Completed today! Try again?';
+    dailyResult.querySelector('.fade-in').appendChild(done);
+  }
+  dailyStartBtn.style.display='';
+}
+
+dailyStartBtn.addEventListener('click',()=>{
+  if(!dailyMode)return;
+  // Switch to that mode's tab and auto-start
+  const tab=document.querySelector(`.tab[data-mode="${dailyMode}"]`);
+  if(tab){
+    tab.click();
+    // Auto-start after a brief delay
+    setTimeout(()=>{
+      if(dailyMode==='simple'){
+        simpleZone.click();
+      } else if(dailyMode==='choice'){
+        choiceStartBtn.click();
+      } else if(dailyMode==='sequence'){
+        seqStartBtn.click();
+      } else if(dailyMode==='aim'){
+        aimStartBtn.click();
+      }
+    },300);
+  }
+});
+
+// Save daily result hook — override addResult
+const origAddResult=addResult;
+function addResultHooked(mode,value){
+  origAddResult(mode,value);
+  // Also save as daily if we came from daily
+  const seed=getDailySeed();
+  const todayKey='daily-'+seed;
+  const d=loadData();
+  if(!d[todayKey]){d[todayKey]={value,mode,time:Date.now()};saveData(d)}
+  // Also add to daily-history for chart
+  origAddResult('daily-history',value);
+}
+
+// Reassign addResult globally — we need to rebind
+window.addResult=addResultHooked;
+
+// Init daily on first load if that tab is shown
+if(currentMode==='daily')setupDaily();
+</script>
+</body>
+</html>

@@ -1,0 +1,699 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+<title>Shop Reference Bible</title>
+<meta name="description" content="Workshop quick-reference: unit converters, drill &amp; tap charts, lumber dimensions, wire gauge, torque specs, and more.">
+<meta name="theme-color" content="#3a5a40">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<link rel="manifest" href="manifest.json">
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#f5f2eb;--bg2:#eae6dd;--bg3:#ddd9cf;
+  --text:#2c2c2c;--text2:#555;--text3:#888;
+  --accent:#3a5a40;--accent2:#588157;--accent-light:#a3b18a;
+  --border:#ccc5b9;--border2:#b8b2a6;
+  --mono:'SFMono-Regular',Consolas,'Liberation Mono','Courier New',monospace;
+  --sans:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;
+  --radius:6px;
+}
+html{font-size:15px;-webkit-text-size-adjust:100%}
+body{
+  font-family:var(--sans);background:var(--bg);color:var(--text);
+  line-height:1.5;padding:0 0 4rem;min-height:100vh;
+}
+h1{font-size:1.35rem;font-weight:700;color:var(--accent);text-align:center;padding:1rem .75rem .25rem}
+.subtitle{text-align:center;font-size:.8rem;color:var(--text3);margin-bottom:.75rem}
+
+/* Search */
+.search-wrap{position:sticky;top:0;z-index:20;background:var(--bg);padding:.5rem .75rem;border-bottom:1px solid var(--border)}
+.search-wrap input{
+  width:100%;padding:.5rem .75rem;border:1px solid var(--border);border-radius:var(--radius);
+  font-size:.95rem;background:#fff;color:var(--text);outline:none;
+}
+.search-wrap input:focus{border-color:var(--accent);box-shadow:0 0 0 2px rgba(58,90,64,.15)}
+.search-wrap input::placeholder{color:var(--text3)}
+
+/* Sections */
+.section{margin:.5rem .75rem;border:1px solid var(--border);border-radius:var(--radius);background:#fff;overflow:hidden}
+.section-header{
+  display:flex;align-items:center;justify-content:space-between;
+  padding:.65rem .85rem;cursor:pointer;user-select:none;
+  background:var(--bg2);border-bottom:1px solid transparent;
+  font-weight:600;font-size:.95rem;color:var(--text);
+  transition:background .15s;
+}
+.section-header:hover{background:var(--bg3)}
+.section-header .chevron{
+  font-size:.7rem;transition:transform .2s;color:var(--text3);flex-shrink:0;margin-left:.5rem;
+}
+.section.open .section-header{border-bottom-color:var(--border)}
+.section.open .chevron{transform:rotate(90deg)}
+.section-body{display:none;padding:.75rem .85rem}
+.section.open .section-body{display:block}
+
+/* Converter panels */
+.converter{margin-bottom:.75rem}
+.converter label{display:block;font-size:.8rem;color:var(--text2);margin-bottom:.2rem;font-weight:500}
+.converter input,.converter select{
+  width:100%;padding:.45rem .6rem;border:1px solid var(--border);border-radius:var(--radius);
+  font-size:.95rem;font-family:var(--mono);background:#fff;color:var(--text);
+}
+.converter select{appearance:auto}
+.converter-row{display:grid;grid-template-columns:1fr auto 1fr;gap:.5rem;align-items:end;margin-bottom:.5rem}
+.converter-row .arrow{text-align:center;color:var(--accent);font-weight:700;padding-bottom:.45rem;font-size:1.1rem}
+.quick-picks{display:flex;flex-wrap:wrap;gap:.35rem;margin-top:.35rem}
+.quick-picks button{
+  padding:.25rem .55rem;border:1px solid var(--border);border-radius:var(--radius);
+  background:var(--bg2);font-size:.78rem;font-family:var(--mono);cursor:pointer;
+  color:var(--text);transition:background .1s,border-color .1s;
+}
+.quick-picks button:hover{background:var(--accent-light);border-color:var(--accent2)}
+.result-display{
+  background:var(--bg);border:1px solid var(--border);border-radius:var(--radius);
+  padding:.4rem .6rem;font-family:var(--mono);font-size:.95rem;min-height:2rem;
+  display:flex;align-items:center;color:var(--accent);font-weight:600;
+}
+.converter-group{margin-bottom:1rem;padding-bottom:1rem;border-bottom:1px solid var(--bg2)}
+.converter-group:last-child{border-bottom:none;margin-bottom:0;padding-bottom:0}
+.converter-group h3{font-size:.85rem;color:var(--accent);margin-bottom:.5rem;font-weight:600}
+
+/* Tables */
+.ref-table-wrap{overflow-x:auto;-webkit-overflow-scrolling:touch;margin:0 -.85rem;padding:0 .85rem}
+table{width:100%;border-collapse:collapse;font-size:.82rem;min-width:400px}
+th{
+  background:var(--bg2);padding:.4rem .5rem;text-align:left;font-weight:600;
+  border-bottom:2px solid var(--border);color:var(--text);white-space:nowrap;
+  position:sticky;top:0;
+}
+td{
+  padding:.35rem .5rem;border-bottom:1px solid var(--bg2);font-family:var(--mono);
+  white-space:nowrap;color:var(--text);
+}
+tr:hover td{background:rgba(58,90,64,.04)}
+tr.highlight td{background:rgba(58,90,64,.1)}
+
+/* Notes */
+.notes-toggle{
+  display:inline-flex;align-items:center;gap:.3rem;
+  margin-top:.75rem;padding:.3rem .6rem;border:1px dashed var(--border);border-radius:var(--radius);
+  background:transparent;font-size:.78rem;color:var(--text2);cursor:pointer;
+}
+.notes-toggle:hover{background:var(--bg2)}
+.notes-area{display:none;margin-top:.5rem}
+.notes-area.open{display:block}
+.notes-area textarea{
+  width:100%;min-height:3.5rem;padding:.5rem;border:1px solid var(--border);border-radius:var(--radius);
+  font-size:.85rem;font-family:var(--sans);resize:vertical;background:var(--bg);color:var(--text);
+}
+.notes-area .save-hint{font-size:.7rem;color:var(--text3);margin-top:.2rem}
+
+/* Home link */
+.home-link{
+  position:fixed;bottom:1.25rem;left:50%;transform:translateX(-50%);
+  font-size:.8rem;color:rgba(0,0,0,.3);text-decoration:none;z-index:10;
+  transition:color .15s;
+}
+.home-link:hover{color:rgba(0,0,0,.6)}
+
+/* No results */
+.no-results{text-align:center;padding:2rem 1rem;color:var(--text3);font-size:.9rem;display:none}
+
+/* Responsive */
+@media(min-width:640px){
+  .section{margin:.5rem auto;max-width:720px}
+  .search-wrap{padding:.5rem calc(50% - 360px + .75rem)}
+  h1,.subtitle{max-width:720px;margin-left:auto;margin-right:auto}
+}
+@media(min-width:900px){
+  .section{max-width:880px}
+  .search-wrap{padding:.5rem calc(50% - 440px + .75rem)}
+  h1,.subtitle{max-width:880px}
+}
+</style>
+</head>
+<body>
+
+<h1>Shop Reference Bible</h1>
+<p class="subtitle">Workshop Quick-Reference Tool</p>
+
+<div class="search-wrap">
+  <input type="search" id="globalSearch" placeholder="Search all tables..." autocomplete="off" spellcheck="false">
+</div>
+
+<div id="app"></div>
+<div class="no-results" id="noResults">No matching results found.</div>
+
+<a href="../" class="home-link">&larr; All Apps</a>
+
+<script>
+// ── Data ──────────────────────────────────────────────
+const DATA = {};
+
+DATA.drillTap = {
+  sae: [
+    ['#4-40','#43 (0.089")','#31 (0.120")'],
+    ['#6-32','#36 (0.107")','#25 (0.150")'],
+    ['#8-32','#29 (0.136")','#18 (0.170")'],
+    ['#10-24','#25 (0.150")','#9 (0.196")'],
+    ['#10-32','#21 (0.159")','#9 (0.196")'],
+    ['1/4"-20','#7 (0.201")','17/64" (0.266")'],
+    ['1/4"-28','#3 (0.213")','17/64" (0.266")'],
+    ['5/16"-18','F (0.257")','21/64" (0.328")'],
+    ['5/16"-24','I (0.272")','21/64" (0.328")'],
+    ['3/8"-16','5/16" (0.313")','25/64" (0.391")'],
+    ['3/8"-24','Q (0.332")','25/64" (0.391")'],
+    ['7/16"-14','U (0.368")','29/64" (0.453")'],
+    ['1/2"-13','27/64" (0.422")','17/32" (0.531")'],
+    ['1/2"-20','29/64" (0.453")','17/32" (0.531")'],
+    ['9/16"-12','31/64" (0.484")','19/32" (0.594")'],
+    ['5/8"-11','17/32" (0.531")','21/32" (0.656")'],
+    ['3/4"-10','21/32" (0.656")','25/32" (0.781")'],
+    ['7/8"-9','49/64" (0.766")','29/32" (0.906")'],
+    ['1"-8','7/8" (0.875")','1-1/32" (1.031")'],
+  ],
+  metric: [
+    ['M3 x 0.5','2.5 mm','3.2 mm'],
+    ['M4 x 0.7','3.3 mm','4.2 mm'],
+    ['M5 x 0.8','4.2 mm','5.3 mm'],
+    ['M6 x 1.0','5.0 mm','6.4 mm'],
+    ['M8 x 1.25','6.8 mm','8.4 mm'],
+    ['M8 x 1.0','7.0 mm','8.4 mm'],
+    ['M10 x 1.5','8.5 mm','10.5 mm'],
+    ['M10 x 1.25','8.8 mm','10.5 mm'],
+    ['M12 x 1.75','10.2 mm','13.0 mm'],
+    ['M12 x 1.25','10.8 mm','13.0 mm'],
+    ['M14 x 2.0','12.0 mm','15.0 mm'],
+    ['M16 x 2.0','14.0 mm','17.0 mm'],
+    ['M18 x 2.5','15.5 mm','19.0 mm'],
+    ['M20 x 2.5','17.5 mm','21.0 mm'],
+    ['M24 x 3.0','21.0 mm','25.0 mm'],
+  ]
+};
+
+DATA.lumber = [
+  ['1 x 2','3/4" x 1-1/2"','19 x 38 mm'],
+  ['1 x 3','3/4" x 2-1/2"','19 x 64 mm'],
+  ['1 x 4','3/4" x 3-1/2"','19 x 89 mm'],
+  ['1 x 6','3/4" x 5-1/2"','19 x 140 mm'],
+  ['1 x 8','3/4" x 7-1/4"','19 x 184 mm'],
+  ['1 x 10','3/4" x 9-1/4"','19 x 235 mm'],
+  ['1 x 12','3/4" x 11-1/4"','19 x 286 mm'],
+  ['2 x 2','1-1/2" x 1-1/2"','38 x 38 mm'],
+  ['2 x 3','1-1/2" x 2-1/2"','38 x 64 mm'],
+  ['2 x 4','1-1/2" x 3-1/2"','38 x 89 mm'],
+  ['2 x 6','1-1/2" x 5-1/2"','38 x 140 mm'],
+  ['2 x 8','1-1/2" x 7-1/4"','38 x 184 mm'],
+  ['2 x 10','1-1/2" x 9-1/4"','38 x 235 mm'],
+  ['2 x 12','1-1/2" x 11-1/4"','38 x 286 mm'],
+  ['4 x 4','3-1/2" x 3-1/2"','89 x 89 mm'],
+  ['4 x 6','3-1/2" x 5-1/2"','89 x 140 mm'],
+  ['6 x 6','5-1/2" x 5-1/2"','140 x 140 mm'],
+];
+
+DATA.wireGauge = [
+  ['0000 (4/0)','0.4600','11.684','195'],
+  ['000 (3/0)','0.4096','10.404','165'],
+  ['00 (2/0)','0.3648','9.266','145'],
+  ['0 (1/0)','0.3249','8.252','125'],
+  ['1','0.2893','7.348','110'],
+  ['2','0.2576','6.544','95'],
+  ['4','0.2043','5.189','70'],
+  ['6','0.1620','4.115','55'],
+  ['8','0.1285','3.264','40'],
+  ['10','0.1019','2.588','30'],
+  ['12','0.0808','2.053','20'],
+  ['14','0.0641','1.628','15'],
+  ['16','0.0508','1.291','10'],
+  ['18','0.0403','1.024','7'],
+  ['20','0.0320','0.812','5'],
+  ['22','0.0253','0.644','3'],
+  ['24','0.0201','0.511','2.1'],
+];
+
+DATA.boltTorque = {
+  sae: [
+    ['1/4"','8','14'],
+    ['5/16"','17','29'],
+    ['3/8"','31','54'],
+    ['7/16"','49','86'],
+    ['1/2"','75','133'],
+    ['9/16"','110','189'],
+    ['5/8"','150','266'],
+    ['3/4"','266','473'],
+    ['7/8"','430','765'],
+    ['1"','640','1140'],
+  ],
+  metric: [
+    ['M6','7','10'],
+    ['M8','18','25'],
+    ['M10','35','50'],
+    ['M12','60','87'],
+    ['M14','97','140'],
+    ['M16','150','215'],
+    ['M18','210','300'],
+    ['M20','300','430'],
+    ['M22','410','580'],
+    ['M24','520','740'],
+  ]
+};
+
+DATA.pipe = [
+  ['1/8"','0.405','0.269','10.3','6.8'],
+  ['1/4"','0.540','0.364','13.7','9.2'],
+  ['3/8"','0.675','0.493','17.1','12.5'],
+  ['1/2"','0.840','0.622','21.3','15.8'],
+  ['3/4"','1.050','0.824','26.7','20.9'],
+  ['1"','1.315','1.049','33.4','26.6'],
+  ['1-1/4"','1.660','1.380','42.2','35.1'],
+  ['1-1/2"','1.900','1.610','48.3','40.9'],
+  ['2"','2.375','2.067','60.3','52.5'],
+  ['2-1/2"','2.875','2.469','73.0','62.7'],
+  ['3"','3.500','3.068','88.9','77.9'],
+  ['4"','4.500','4.026','114.3','102.3'],
+];
+
+DATA.sheetMetal = [
+  ['7','0.1793','0.1443','0.1875'],
+  ['8','0.1644','0.1285','0.1719'],
+  ['9','0.1495','0.1144','0.1563'],
+  ['10','0.1345','0.1019','0.1406'],
+  ['11','0.1196','0.0907','0.1250'],
+  ['12','0.1046','0.0808','0.1094'],
+  ['13','0.0897','0.0720','0.0938'],
+  ['14','0.0747','0.0641','0.0781'],
+  ['16','0.0598','0.0508','0.0625'],
+  ['18','0.0478','0.0403','0.0500'],
+  ['20','0.0359','0.0320','0.0375'],
+  ['22','0.0299','0.0253','0.0313'],
+  ['24','0.0239','0.0201','0.0250'],
+  ['26','0.0179','0.0159','0.0188'],
+  ['28','0.0149','0.0126','0.0156'],
+];
+
+DATA.threadPitch = {
+  sae: [
+    ['#4','40','48'],
+    ['#6','32','40'],
+    ['#8','32','36'],
+    ['#10','24','32'],
+    ['1/4"','20','28'],
+    ['5/16"','18','24'],
+    ['3/8"','16','24'],
+    ['7/16"','14','20'],
+    ['1/2"','13','20'],
+    ['9/16"','12','18'],
+    ['5/8"','11','18'],
+    ['3/4"','10','16'],
+    ['7/8"','9','14'],
+    ['1"','8','12'],
+  ],
+  metric: [
+    ['M3','0.50','0.35'],
+    ['M4','0.70','0.50'],
+    ['M5','0.80','0.50'],
+    ['M6','1.00','0.75'],
+    ['M8','1.25','1.00'],
+    ['M10','1.50','1.25'],
+    ['M12','1.75','1.25'],
+    ['M14','2.00','1.50'],
+    ['M16','2.00','1.50'],
+    ['M18','2.50','1.50'],
+    ['M20','2.50','1.50'],
+    ['M24','3.00','2.00'],
+  ]
+};
+
+// ── Fractions ──────────────────────────────────────────
+const FRACTIONS = [
+  [1,64],[1,32],[3,64],[1,16],[5,64],[3,32],[7,64],[1,8],
+  [9,64],[5,32],[11,64],[3,16],[13,64],[7,32],[15,64],[1,4],
+  [17,64],[9,32],[19,64],[5,16],[21,64],[11,32],[23,64],[3,8],
+  [25,64],[13,32],[27,64],[7,16],[29,64],[15,32],[31,64],[1,2],
+  [33,64],[17,32],[35,64],[9,16],[37,64],[19,32],[39,64],[5,8],
+  [41,64],[21,32],[43,64],[11,16],[45,64],[23,32],[47,64],[3,4],
+  [49,64],[25,32],[51,64],[13,16],[53,64],[27,32],[55,64],[7,8],
+  [57,64],[29,32],[59,64],[15,16],[61,64],[31,32],[63,64],[1,1]
+];
+
+const QUICK_FRACS = ['1/8','3/16','1/4','5/16','3/8','7/16','1/2','9/16','5/8','11/16','3/4','7/8','1'];
+
+function fracToDecimal(n,d){ return n/d; }
+
+function decimalToFrac(val){
+  if(val<=0||val>1) return val===1?'1"':'--';
+  let best=null, bestDiff=999;
+  for(const [n,d] of FRACTIONS){
+    const diff=Math.abs(val-n/d);
+    if(diff<bestDiff){bestDiff=diff;best=[n,d];}
+  }
+  if(best) return best[0]+'/'+best[1]+'"';
+  return val.toFixed(4)+'"';
+}
+
+// ── Rendering ──────────────────────────────────────────
+function buildApp(){
+  const app=document.getElementById('app');
+  app.innerHTML = buildConverterSection() +
+    buildSection('drill-tap','Drill & Tap Chart',buildDrillTapHTML()) +
+    buildSection('lumber','Lumber Dimensions',buildLumberHTML()) +
+    buildSection('wire-gauge','Wire Gauge (AWG)',buildWireGaugeHTML()) +
+    buildSection('bolt-torque','Bolt Torque Specs',buildBoltTorqueHTML()) +
+    buildSection('pipe','Pipe Sizing',buildPipeHTML()) +
+    buildSection('sheet-metal','Sheet Metal Gauge',buildSheetMetalHTML()) +
+    buildSection('thread-pitch','Common Thread Pitches',buildThreadPitchHTML());
+}
+
+function buildSection(id,title,body){
+  return `<div class="section" data-section="${id}" id="sec-${id}">
+    <div class="section-header" onclick="toggleSection(this)">
+      <span>${title}</span><span class="chevron">&#9654;</span>
+    </div>
+    <div class="section-body">
+      ${body}
+      ${buildNotesArea(id)}
+    </div>
+  </div>`;
+}
+
+function buildNotesArea(id){
+  return `<button class="notes-toggle" onclick="toggleNotes(this)">&#128221; My Notes</button>
+  <div class="notes-area" data-notes="${id}">
+    <textarea placeholder="Add your notes for this section..." oninput="saveNote('${id}',this.value)">${loadNote(id)}</textarea>
+    <div class="save-hint">Auto-saved to this browser</div>
+  </div>`;
+}
+
+function buildConverterSection(){
+  return `<div class="section open" data-section="converters" id="sec-converters">
+    <div class="section-header" onclick="toggleSection(this)">
+      <span>Unit Converters</span><span class="chevron">&#9654;</span>
+    </div>
+    <div class="section-body">
+      ${buildFracConverter()}
+      ${buildLengthConverter()}
+      ${buildWeightConverter()}
+      ${buildTempConverter()}
+      ${buildNotesArea('converters')}
+    </div>
+  </div>`;
+}
+
+function buildFracConverter(){
+  return `<div class="converter-group">
+    <h3>Fractions &harr; Decimals</h3>
+    <div class="converter">
+      <div class="converter-row">
+        <div>
+          <label>Fraction (e.g. 3/8)</label>
+          <input type="text" id="fracIn" placeholder="3/8" oninput="convertFrac()">
+        </div>
+        <div class="arrow">&harr;</div>
+        <div>
+          <label>Decimal (inches)</label>
+          <input type="text" id="decIn" placeholder="0.375" oninput="convertDec()">
+        </div>
+      </div>
+      <label>Quick picks:</label>
+      <div class="quick-picks">
+        ${QUICK_FRACS.map(f=>`<button onclick="pickFrac('${f}')">${f}</button>`).join('')}
+      </div>
+    </div>
+  </div>`;
+}
+
+function buildLengthConverter(){
+  return `<div class="converter-group">
+    <h3>Imperial &harr; Metric (Length)</h3>
+    <div class="converter">
+      <div class="converter-row">
+        <div>
+          <label>Value</label>
+          <input type="number" id="lenVal" placeholder="0" step="any" oninput="convertLength()">
+        </div>
+        <div class="arrow">&rarr;</div>
+        <div>
+          <label>Result</label>
+          <div class="result-display" id="lenResult">--</div>
+        </div>
+      </div>
+      <div class="converter-row" style="grid-template-columns:1fr auto 1fr">
+        <div>
+          <label>From</label>
+          <select id="lenFrom" onchange="convertLength()">
+            <option value="in">inches</option><option value="ft">feet</option>
+            <option value="mm">mm</option><option value="cm">cm</option><option value="m">meters</option>
+          </select>
+        </div>
+        <div class="arrow">&rarr;</div>
+        <div>
+          <label>To</label>
+          <select id="lenTo" onchange="convertLength()">
+            <option value="mm" selected>mm</option><option value="cm">cm</option><option value="m">meters</option>
+            <option value="in">inches</option><option value="ft">feet</option>
+          </select>
+        </div>
+      </div>
+    </div>
+  </div>`;
+}
+
+function buildWeightConverter(){
+  return `<div class="converter-group">
+    <h3>Weight</h3>
+    <div class="converter">
+      <div class="converter-row">
+        <div>
+          <label>Pounds (lbs)</label>
+          <input type="number" id="lbsIn" placeholder="0" step="any" oninput="convertWeight('lbs')">
+        </div>
+        <div class="arrow">&harr;</div>
+        <div>
+          <label>Kilograms (kg)</label>
+          <input type="number" id="kgIn" placeholder="0" step="any" oninput="convertWeight('kg')">
+        </div>
+      </div>
+    </div>
+  </div>`;
+}
+
+function buildTempConverter(){
+  return `<div class="converter-group">
+    <h3>Temperature</h3>
+    <div class="converter">
+      <div class="converter-row">
+        <div>
+          <label>Fahrenheit (&deg;F)</label>
+          <input type="number" id="fIn" placeholder="72" step="any" oninput="convertTemp('f')">
+        </div>
+        <div class="arrow">&harr;</div>
+        <div>
+          <label>Celsius (&deg;C)</label>
+          <input type="number" id="cIn" placeholder="22" step="any" oninput="convertTemp('c')">
+        </div>
+      </div>
+    </div>
+  </div>`;
+}
+
+// ── Reference Tables ──────────────────────────────────
+function tableWrap(html){ return `<div class="ref-table-wrap">${html}</div>`; }
+
+function buildDrillTapHTML(){
+  let h='<h3 style="margin-bottom:.5rem;font-size:.85rem;color:var(--accent)">SAE (Inch)</h3>';
+  h+=tableWrap(`<table><thead><tr><th>Bolt Size</th><th>Tap Drill</th><th>Clearance Drill</th></tr></thead><tbody>
+    ${DATA.drillTap.sae.map(r=>`<tr><td>${r[0]}</td><td>${r[1]}</td><td>${r[2]}</td></tr>`).join('')}
+  </tbody></table>`);
+  h+='<h3 style="margin:.75rem 0 .5rem;font-size:.85rem;color:var(--accent)">Metric</h3>';
+  h+=tableWrap(`<table><thead><tr><th>Bolt Size</th><th>Tap Drill</th><th>Clearance Drill</th></tr></thead><tbody>
+    ${DATA.drillTap.metric.map(r=>`<tr><td>${r[0]}</td><td>${r[1]}</td><td>${r[2]}</td></tr>`).join('')}
+  </tbody></table>`);
+  return h;
+}
+
+function buildLumberHTML(){
+  return tableWrap(`<table><thead><tr><th>Nominal</th><th>Actual (Imperial)</th><th>Actual (Metric)</th></tr></thead><tbody>
+    ${DATA.lumber.map(r=>`<tr><td>${r[0]}</td><td>${r[1]}</td><td>${r[2]}</td></tr>`).join('')}
+  </tbody></table>`);
+}
+
+function buildWireGaugeHTML(){
+  return tableWrap(`<table><thead><tr><th>AWG</th><th>Dia (in)</th><th>Dia (mm)</th><th>Max Amps*</th></tr></thead><tbody>
+    ${DATA.wireGauge.map(r=>`<tr><td>${r[0]}</td><td>${r[1]}</td><td>${r[2]}</td><td>${r[3]} A</td></tr>`).join('')}
+  </tbody></table>`) + '<p style="font-size:.7rem;color:var(--text3);margin-top:.3rem">*Ampacity for copper, 60&deg;C rating, in free air. Derate for conduit/bundling.</p>';
+}
+
+function buildBoltTorqueHTML(){
+  let h='<h3 style="margin-bottom:.5rem;font-size:.85rem;color:var(--accent)">SAE (ft-lbs, dry)</h3>';
+  h+=tableWrap(`<table><thead><tr><th>Bolt Size</th><th>Grade 5</th><th>Grade 8</th></tr></thead><tbody>
+    ${DATA.boltTorque.sae.map(r=>`<tr><td>${r[0]}</td><td>${r[1]}</td><td>${r[2]}</td></tr>`).join('')}
+  </tbody></table>`);
+  h+='<h3 style="margin:.75rem 0 .5rem;font-size:.85rem;color:var(--accent)">Metric (N&middot;m, dry)</h3>';
+  h+=tableWrap(`<table><thead><tr><th>Bolt Size</th><th>Class 8.8</th><th>Class 10.9</th></tr></thead><tbody>
+    ${DATA.boltTorque.metric.map(r=>`<tr><td>${r[0]}</td><td>${r[1]}</td><td>${r[2]}</td></tr>`).join('')}
+  </tbody></table>`);
+  h+='<p style="font-size:.7rem;color:var(--text3);margin-top:.3rem">Dry torque values. Reduce ~25% for lubricated fasteners.</p>';
+  return h;
+}
+
+function buildPipeHTML(){
+  return tableWrap(`<table><thead><tr><th>Nominal</th><th>OD (in)</th><th>ID (in)*</th><th>OD (mm)</th><th>ID (mm)*</th></tr></thead><tbody>
+    ${DATA.pipe.map(r=>`<tr><td>${r[0]}</td><td>${r[1]}</td><td>${r[2]}</td><td>${r[3]}</td><td>${r[4]}</td></tr>`).join('')}
+  </tbody></table>`) + '<p style="font-size:.7rem;color:var(--text3);margin-top:.3rem">*ID shown for Schedule 40 steel pipe.</p>';
+}
+
+function buildSheetMetalHTML(){
+  return tableWrap(`<table><thead><tr><th>Gauge</th><th>Steel (in)</th><th>Aluminum (in)</th><th>Stainless (in)</th></tr></thead><tbody>
+    ${DATA.sheetMetal.map(r=>`<tr><td>${r[0]}</td><td>${r[1]}</td><td>${r[2]}</td><td>${r[3]}</td></tr>`).join('')}
+  </tbody></table>`) + '<p style="font-size:.7rem;color:var(--text3);margin-top:.3rem">Steel = standard gauge, Aluminum = B&S/AWG gauge, Stainless = standard gauge.</p>';
+}
+
+function buildThreadPitchHTML(){
+  let h='<h3 style="margin-bottom:.5rem;font-size:.85rem;color:var(--accent)">SAE (threads per inch)</h3>';
+  h+=tableWrap(`<table><thead><tr><th>Size</th><th>UNC (Coarse)</th><th>UNF (Fine)</th></tr></thead><tbody>
+    ${DATA.threadPitch.sae.map(r=>`<tr><td>${r[0]}</td><td>${r[1]} TPI</td><td>${r[2]} TPI</td></tr>`).join('')}
+  </tbody></table>`);
+  h+='<h3 style="margin:.75rem 0 .5rem;font-size:.85rem;color:var(--accent)">Metric (pitch in mm)</h3>';
+  h+=tableWrap(`<table><thead><tr><th>Size</th><th>Coarse</th><th>Fine</th></tr></thead><tbody>
+    ${DATA.threadPitch.metric.map(r=>`<tr><td>${r[0]}</td><td>${r[1]} mm</td><td>${r[2]} mm</td></tr>`).join('')}
+  </tbody></table>`);
+  return h;
+}
+
+// ── Interaction ───────────────────────────────────────
+function toggleSection(el){
+  el.parentElement.classList.toggle('open');
+}
+
+function toggleNotes(btn){
+  const area = btn.nextElementSibling;
+  area.classList.toggle('open');
+  if(area.classList.contains('open')){
+    area.querySelector('textarea').focus();
+  }
+}
+
+function saveNote(id,val){
+  try{localStorage.setItem('shop-note-'+id,val);}catch(e){}
+}
+function loadNote(id){
+  try{return localStorage.getItem('shop-note-'+id)||'';}catch(e){return '';}
+}
+
+// ── Converters ────────────────────────────────────────
+function convertFrac(){
+  const v = document.getElementById('fracIn').value.trim();
+  const m = v.match(/^(\d+)\s*\/\s*(\d+)$/);
+  if(m){
+    const dec = parseInt(m[1])/parseInt(m[2]);
+    document.getElementById('decIn').value = dec.toFixed(4);
+  }
+}
+function convertDec(){
+  const v = parseFloat(document.getElementById('decIn').value);
+  if(!isNaN(v)&&v>=0&&v<=1){
+    document.getElementById('fracIn').value = decimalToFrac(v).replace('"','');
+  }
+}
+function pickFrac(f){
+  document.getElementById('fracIn').value = f;
+  convertFrac();
+}
+
+const LEN_TO_IN = {in:1,ft:12,mm:1/25.4,cm:1/2.54,m:1/0.0254};
+function convertLength(){
+  const v = parseFloat(document.getElementById('lenVal').value);
+  if(isNaN(v)){document.getElementById('lenResult').textContent='--';return;}
+  const from=document.getElementById('lenFrom').value;
+  const to=document.getElementById('lenTo').value;
+  const inches = v * LEN_TO_IN[from];
+  const result = inches / LEN_TO_IN[to];
+  const units = {in:'in',ft:'ft',mm:'mm',cm:'cm',m:'m'};
+  document.getElementById('lenResult').textContent = (Math.round(result*10000)/10000)+' '+units[to];
+}
+
+function convertWeight(dir){
+  if(dir==='lbs'){
+    const v=parseFloat(document.getElementById('lbsIn').value);
+    document.getElementById('kgIn').value=isNaN(v)?'':(v*0.453592).toFixed(3);
+  } else {
+    const v=parseFloat(document.getElementById('kgIn').value);
+    document.getElementById('lbsIn').value=isNaN(v)?'':(v/0.453592).toFixed(3);
+  }
+}
+
+function convertTemp(dir){
+  if(dir==='f'){
+    const v=parseFloat(document.getElementById('fIn').value);
+    document.getElementById('cIn').value=isNaN(v)?'':((v-32)*5/9).toFixed(1);
+  } else {
+    const v=parseFloat(document.getElementById('cIn').value);
+    document.getElementById('fIn').value=isNaN(v)?'':(v*9/5+32).toFixed(1);
+  }
+}
+
+// ── Search ────────────────────────────────────────────
+function initSearch(){
+  const input = document.getElementById('globalSearch');
+  input.addEventListener('input', function(){
+    const q = this.value.trim().toLowerCase();
+    const sections = document.querySelectorAll('.section');
+    let anyVisible = false;
+
+    sections.forEach(sec=>{
+      const secId = sec.dataset.section;
+      if(secId === 'converters'){
+        // always show converters unless searching
+        if(!q){sec.style.display='';return;}
+        const text = sec.textContent.toLowerCase();
+        const match = text.includes(q);
+        sec.style.display = match ? '' : 'none';
+        if(match) anyVisible = true;
+        return;
+      }
+
+      const rows = sec.querySelectorAll('tbody tr');
+      if(!q){
+        rows.forEach(r=>{r.style.display='';r.classList.remove('highlight');});
+        sec.style.display='';
+        anyVisible=true;
+        return;
+      }
+
+      let secMatch=false;
+      rows.forEach(r=>{
+        const txt=r.textContent.toLowerCase();
+        if(txt.includes(q)){
+          r.style.display='';
+          r.classList.add('highlight');
+          secMatch=true;
+        } else {
+          r.style.display='none';
+          r.classList.remove('highlight');
+        }
+      });
+
+      // Also check section title / header text
+      const headerText = sec.querySelector('.section-header span').textContent.toLowerCase();
+      if(headerText.includes(q)) secMatch = true;
+
+      sec.style.display = secMatch ? '' : 'none';
+      if(secMatch){
+        sec.classList.add('open');
+        anyVisible=true;
+      }
+    });
+
+    document.getElementById('noResults').style.display = (!anyVisible && q) ? 'block' : 'none';
+  });
+}
+
+// ── Init ──────────────────────────────────────────────
+buildApp();
+initSearch();
+</script>
+</body>
+</html>

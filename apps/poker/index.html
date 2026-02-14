@@ -1,0 +1,950 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Poker Odds Calculator + Hand Trainer</title>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --felt:#1a6b3c;--felt-dark:#145a30;--felt-light:#1e7d45;
+  --gold:#d4a843;--gold-dim:#a8862f;
+  --card-white:#f5f5f0;--card-shadow:rgba(0,0,0,0.4);
+  --red:#d42020;--black:#1a1a1a;
+  --bg:#0e0e0e;--text:#e8e8e0;--text-dim:rgba(255,255,255,0.5);
+  --accent:#3ecf8e;--danger:#e74c3c;
+}
+html{font-size:16px}
+body{
+  font-family:'Segoe UI',system-ui,-apple-system,sans-serif;
+  background:var(--felt);
+  background-image:
+    radial-gradient(ellipse at 50% 0%,var(--felt-light) 0%,var(--felt) 60%,var(--felt-dark) 100%);
+  color:var(--text);min-height:100vh;
+  padding-bottom:4rem;
+  overflow-x:hidden;
+}
+/* Felt texture overlay */
+body::before{
+  content:'';position:fixed;inset:0;
+  background-image:url("data:image/svg+xml,%3Csvg width='6' height='6' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='6' height='6' filter='url(%23n)' opacity='0.03'/%3E%3C/svg%3E");
+  pointer-events:none;z-index:0;opacity:0.5;
+}
+.container{max-width:480px;margin:0 auto;padding:0.75rem;position:relative;z-index:1}
+
+/* Tabs */
+.tabs{display:flex;gap:0;margin-bottom:1rem;border-radius:10px;overflow:hidden;border:2px solid rgba(255,255,255,0.1)}
+.tab-btn{
+  flex:1;padding:0.7rem 0.5rem;border:none;background:rgba(0,0,0,0.25);
+  color:var(--text-dim);font-size:0.85rem;font-weight:600;cursor:pointer;
+  transition:all 0.2s;text-transform:uppercase;letter-spacing:0.05em;
+}
+.tab-btn.active{background:rgba(0,0,0,0.5);color:var(--gold);box-shadow:inset 0 -2px 0 var(--gold)}
+.tab-btn:hover:not(.active){background:rgba(0,0,0,0.35);color:var(--text)}
+.tab-content{display:none}
+.tab-content.active{display:block}
+
+/* Section headers */
+.section-label{
+  font-size:0.7rem;text-transform:uppercase;letter-spacing:0.1em;
+  color:var(--text-dim);margin-bottom:0.5rem;font-weight:600;
+}
+
+/* Card display areas */
+.hand-area{
+  background:rgba(0,0,0,0.2);border-radius:12px;padding:1rem;
+  margin-bottom:0.75rem;border:1px solid rgba(255,255,255,0.06);
+}
+.hand-area-title{
+  font-size:0.75rem;color:var(--gold);text-transform:uppercase;
+  letter-spacing:0.08em;margin-bottom:0.6rem;font-weight:600;
+}
+.card-slots{display:flex;gap:0.4rem;flex-wrap:wrap;min-height:3.8rem;align-items:center}
+.card-slot{
+  width:2.8rem;height:3.8rem;border-radius:6px;
+  border:2px dashed rgba(255,255,255,0.15);
+  display:flex;align-items:center;justify-content:center;
+  font-size:0.65rem;color:var(--text-dim);cursor:pointer;
+  transition:all 0.15s;position:relative;
+}
+.card-slot:hover{border-color:rgba(255,255,255,0.3)}
+.card-slot.filled{border:none;cursor:pointer}
+.card-slot .remove-x{
+  position:absolute;top:-4px;right:-4px;width:16px;height:16px;
+  background:var(--danger);border-radius:50%;font-size:10px;
+  display:none;align-items:center;justify-content:center;color:#fff;
+  line-height:1;font-weight:bold;
+}
+.card-slot.filled:hover .remove-x{display:flex}
+
+/* Playing card styling */
+.mini-card{
+  width:2.8rem;height:3.8rem;background:var(--card-white);
+  border-radius:6px;display:flex;flex-direction:column;
+  align-items:center;justify-content:center;
+  box-shadow:0 2px 6px var(--card-shadow),inset 0 1px 0 rgba(255,255,255,0.8);
+  font-weight:700;line-height:1;user-select:none;position:relative;
+}
+.mini-card .rank{font-size:1rem}
+.mini-card .suit{font-size:0.85rem;margin-top:-1px}
+.mini-card.red{color:var(--red)}
+.mini-card.black{color:var(--black)}
+
+/* Card picker grid */
+.picker-overlay{
+  display:none;position:fixed;inset:0;z-index:100;
+  background:rgba(0,0,0,0.7);backdrop-filter:blur(3px);
+  align-items:flex-end;justify-content:center;
+}
+.picker-overlay.open{display:flex}
+.picker-panel{
+  background:#1a2a1f;border-radius:16px 16px 0 0;
+  padding:1rem;width:100%;max-width:480px;max-height:80vh;
+  overflow-y:auto;box-shadow:0 -4px 30px rgba(0,0,0,0.5);
+  border-top:1px solid rgba(255,255,255,0.08);
+}
+.picker-header{
+  display:flex;justify-content:space-between;align-items:center;
+  margin-bottom:0.75rem;
+}
+.picker-header h3{font-size:0.9rem;color:var(--gold)}
+.picker-close{
+  background:none;border:none;color:var(--text-dim);font-size:1.3rem;
+  cursor:pointer;padding:0.25rem;
+}
+.picker-close:hover{color:var(--text)}
+.suit-section{margin-bottom:0.6rem}
+.suit-section-label{
+  font-size:0.65rem;text-transform:uppercase;letter-spacing:0.08em;
+  color:var(--text-dim);margin-bottom:0.35rem;display:flex;align-items:center;gap:0.3rem;
+}
+.suit-section-label .suit-icon{font-size:0.8rem}
+.suit-section-label .suit-icon.red{color:var(--red)}
+.suit-section-label .suit-icon.black{color:var(--black)}
+.picker-row{display:grid;grid-template-columns:repeat(13,1fr);gap:3px}
+.pick-card{
+  aspect-ratio:2.8/3.8;border-radius:4px;border:1.5px solid rgba(255,255,255,0.1);
+  background:var(--card-white);display:flex;flex-direction:column;
+  align-items:center;justify-content:center;cursor:pointer;
+  font-weight:700;transition:all 0.1s;font-size:0.55rem;line-height:1.1;
+  box-shadow:0 1px 3px rgba(0,0,0,0.3);
+}
+.pick-card .rank{font-size:0.7rem}
+.pick-card .suit{font-size:0.6rem}
+.pick-card.red{color:var(--red)}
+.pick-card.black{color:var(--black)}
+.pick-card:hover:not(.used){transform:scale(1.1);z-index:1;box-shadow:0 2px 8px rgba(0,0,0,0.4)}
+.pick-card.used{opacity:0.15;cursor:not-allowed;transform:none}
+.pick-card.selected{
+  border-color:var(--gold);box-shadow:0 0 0 2px var(--gold),0 2px 8px rgba(212,168,67,0.3);
+  transform:scale(1.05);
+}
+
+/* Results panel */
+.results-panel{
+  background:rgba(0,0,0,0.3);border-radius:12px;padding:1rem;
+  margin-top:0.75rem;border:1px solid rgba(255,255,255,0.06);
+}
+.results-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:0.75rem;text-align:center}
+.result-item .result-value{font-size:1.6rem;font-weight:700;color:var(--accent);line-height:1.2}
+.result-item .result-label{font-size:0.6rem;text-transform:uppercase;letter-spacing:0.08em;color:var(--text-dim);margin-top:0.15rem}
+.iter-count{text-align:center;font-size:0.65rem;color:var(--text-dim);margin-top:0.5rem}
+
+/* Buttons */
+.btn{
+  padding:0.6rem 1.2rem;border-radius:8px;border:none;
+  font-weight:600;font-size:0.8rem;cursor:pointer;
+  transition:all 0.15s;text-transform:uppercase;letter-spacing:0.05em;
+}
+.btn-primary{background:var(--gold);color:#1a1a1a}
+.btn-primary:hover{background:var(--gold-dim)}
+.btn-danger{background:rgba(231,76,60,0.2);color:var(--danger);border:1px solid rgba(231,76,60,0.3)}
+.btn-danger:hover{background:rgba(231,76,60,0.3)}
+.btn-row{display:flex;gap:0.5rem;margin-top:0.75rem;flex-wrap:wrap}
+
+/* Villain range toggle */
+.villain-section{margin-top:0.5rem}
+.range-toggle{
+  display:flex;gap:0;border-radius:8px;overflow:hidden;
+  border:1px solid rgba(255,255,255,0.1);margin-bottom:0.6rem;
+}
+.range-toggle button{
+  flex:1;padding:0.45rem;background:rgba(0,0,0,0.2);border:none;
+  color:var(--text-dim);font-size:0.7rem;cursor:pointer;font-weight:600;
+}
+.range-toggle button.active{background:rgba(0,0,0,0.5);color:var(--gold)}
+
+/* Progress bar */
+.progress-bar{
+  height:3px;background:rgba(255,255,255,0.08);border-radius:2px;
+  margin-top:0.5rem;overflow:hidden;
+}
+.progress-fill{height:100%;background:var(--accent);transition:width 0.3s;width:0}
+
+/* Quiz tab */
+.quiz-board{
+  background:rgba(0,0,0,0.2);border-radius:12px;padding:1rem;
+  margin-bottom:0.75rem;border:1px solid rgba(255,255,255,0.06);
+}
+.quiz-board-title{
+  font-size:0.7rem;color:var(--text-dim);text-transform:uppercase;
+  letter-spacing:0.08em;margin-bottom:0.5rem;
+}
+.quiz-cards{display:flex;gap:0.4rem;justify-content:center;flex-wrap:wrap}
+.quiz-divider{
+  width:2px;background:rgba(255,255,255,0.15);margin:0 0.3rem;
+  border-radius:1px;align-self:stretch;
+}
+
+.equity-buttons{display:grid;grid-template-columns:repeat(5,1fr);gap:0.4rem;margin:0.75rem 0}
+.eq-btn{
+  padding:0.7rem 0.3rem;border-radius:8px;border:2px solid rgba(255,255,255,0.1);
+  background:rgba(0,0,0,0.2);color:var(--text);font-size:0.75rem;
+  font-weight:600;cursor:pointer;transition:all 0.15s;text-align:center;
+}
+.eq-btn:hover{border-color:rgba(255,255,255,0.3);background:rgba(0,0,0,0.35)}
+.eq-btn.selected{border-color:var(--gold);background:rgba(212,168,67,0.15);color:var(--gold)}
+.eq-btn.correct{border-color:var(--accent);background:rgba(62,207,142,0.15);color:var(--accent)}
+.eq-btn.wrong{border-color:var(--danger);background:rgba(231,76,60,0.15);color:var(--danger)}
+.eq-btn.actual{border-color:var(--accent);background:rgba(62,207,142,0.25);color:var(--accent);box-shadow:0 0 8px rgba(62,207,142,0.2)}
+
+.quiz-result{
+  text-align:center;padding:0.75rem;border-radius:10px;
+  margin-top:0.75rem;font-weight:600;font-size:0.9rem;
+}
+.quiz-result.good{background:rgba(62,207,142,0.15);color:var(--accent)}
+.quiz-result.ok{background:rgba(212,168,67,0.15);color:var(--gold)}
+.quiz-result.bad{background:rgba(231,76,60,0.15);color:var(--danger)}
+.quiz-result .actual-eq{font-size:1.3rem;display:block;margin-top:0.2rem}
+.quiz-result .points{font-size:0.75rem;margin-top:0.3rem;opacity:0.8}
+
+/* Stats bar */
+.stats-bar{
+  display:flex;gap:0.75rem;justify-content:center;
+  padding:0.6rem;background:rgba(0,0,0,0.2);border-radius:10px;
+  margin-bottom:0.75rem;border:1px solid rgba(255,255,255,0.06);
+}
+.stat{text-align:center}
+.stat .stat-val{font-size:1.1rem;font-weight:700;color:var(--gold)}
+.stat .stat-lbl{font-size:0.55rem;text-transform:uppercase;letter-spacing:0.08em;color:var(--text-dim);margin-top:0.1rem}
+
+/* Presets */
+.presets-section{margin-top:1rem}
+.preset-btn{
+  display:block;width:100%;text-align:left;padding:0.65rem 0.75rem;
+  background:rgba(0,0,0,0.15);border:1px solid rgba(255,255,255,0.06);
+  border-radius:8px;color:var(--text);font-size:0.78rem;cursor:pointer;
+  margin-bottom:0.4rem;transition:all 0.15s;
+}
+.preset-btn:hover{background:rgba(0,0,0,0.3);border-color:rgba(255,255,255,0.12)}
+.preset-btn .preset-name{font-weight:600;color:var(--gold-dim)}
+.preset-btn .preset-desc{color:var(--text-dim);font-size:0.68rem;margin-top:0.15rem}
+
+/* Home link */
+.home-link{
+  position:fixed;bottom:1.25rem;left:50%;transform:translateX(-50%);
+  font-size:0.8rem;color:rgba(255,255,255,0.35);text-decoration:none;
+  z-index:10;transition:color 0.2s;
+}
+.home-link:hover{color:rgba(255,255,255,0.7)}
+
+/* Animations */
+@keyframes fadeIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+.fade-in{animation:fadeIn 0.25s ease-out}
+
+/* Scrollbar */
+::-webkit-scrollbar{width:4px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:rgba(255,255,255,0.15);border-radius:2px}
+</style>
+</head>
+<body>
+
+<div class="container">
+  <div class="tabs">
+    <button class="tab-btn active" data-tab="calc">Odds Calculator</button>
+    <button class="tab-btn" data-tab="quiz">Hand Trainer</button>
+  </div>
+
+  <!-- CALCULATOR TAB -->
+  <div id="tab-calc" class="tab-content active">
+    <div class="hand-area">
+      <div class="hand-area-title">Your Hand</div>
+      <div class="card-slots" id="hero-slots">
+        <div class="card-slot" data-target="hero" data-index="0"><span>+</span></div>
+        <div class="card-slot" data-target="hero" data-index="1"><span>+</span></div>
+      </div>
+    </div>
+
+    <div class="hand-area villain-section">
+      <div class="hand-area-title">Villain</div>
+      <div class="range-toggle">
+        <button class="active" data-mode="random">Random Hand</button>
+        <button data-mode="specific">Specific Hand</button>
+      </div>
+      <div class="card-slots" id="villain-slots" style="display:none">
+        <div class="card-slot" data-target="villain" data-index="0"><span>+</span></div>
+        <div class="card-slot" data-target="villain" data-index="1"><span>+</span></div>
+      </div>
+      <div id="villain-random-label" style="font-size:0.75rem;color:var(--text-dim)">Simulating against a random hand</div>
+    </div>
+
+    <div class="hand-area">
+      <div class="hand-area-title">Community Cards</div>
+      <div class="card-slots" id="board-slots">
+        <div class="card-slot" data-target="board" data-index="0"><span>+</span></div>
+        <div class="card-slot" data-target="board" data-index="1"><span>+</span></div>
+        <div class="card-slot" data-target="board" data-index="2"><span>+</span></div>
+        <div class="card-slot" data-target="board" data-index="3"><span>+</span></div>
+        <div class="card-slot" data-target="board" data-index="4"><span>+</span></div>
+      </div>
+    </div>
+
+    <div class="btn-row">
+      <button class="btn btn-primary" id="calc-btn" disabled>Calculate Equity</button>
+      <button class="btn btn-danger" id="clear-btn">Clear All</button>
+    </div>
+
+    <div class="results-panel" id="results-panel" style="display:none">
+      <div class="results-grid">
+        <div class="result-item">
+          <div class="result-value" id="res-win">--</div>
+          <div class="result-label">Win %</div>
+        </div>
+        <div class="result-item">
+          <div class="result-value" id="res-tie">--</div>
+          <div class="result-label">Tie %</div>
+        </div>
+        <div class="result-item">
+          <div class="result-value" id="res-equity">--</div>
+          <div class="result-label">Equity</div>
+        </div>
+      </div>
+      <div class="progress-bar"><div class="progress-fill" id="progress-fill"></div></div>
+      <div class="iter-count" id="iter-count"></div>
+    </div>
+  </div>
+
+  <!-- QUIZ TAB -->
+  <div id="tab-quiz" class="tab-content">
+    <div class="stats-bar">
+      <div class="stat"><div class="stat-val" id="q-score">0</div><div class="stat-lbl">Score</div></div>
+      <div class="stat"><div class="stat-val" id="q-hands">0</div><div class="stat-lbl">Hands</div></div>
+      <div class="stat"><div class="stat-val" id="q-avg">--</div><div class="stat-lbl">Avg Pts</div></div>
+      <div class="stat"><div class="stat-val" id="q-streak">0</div><div class="stat-lbl">Streak</div></div>
+    </div>
+
+    <div class="quiz-board">
+      <div class="quiz-board-title">Your Hand</div>
+      <div class="quiz-cards" id="quiz-hero-cards"></div>
+    </div>
+    <div class="quiz-board">
+      <div class="quiz-board-title" id="quiz-board-label">Board</div>
+      <div class="quiz-cards" id="quiz-board-cards"></div>
+    </div>
+
+    <div class="section-label" style="margin-top:0.75rem">Estimate your equity vs a random hand:</div>
+    <div class="equity-buttons" id="eq-buttons">
+      <button class="eq-btn" data-range="0">0-20%</button>
+      <button class="eq-btn" data-range="1">20-40%</button>
+      <button class="eq-btn" data-range="2">40-60%</button>
+      <button class="eq-btn" data-range="3">60-80%</button>
+      <button class="eq-btn" data-range="4">80-100%</button>
+    </div>
+
+    <div id="quiz-result"></div>
+
+    <div class="btn-row" style="justify-content:center">
+      <button class="btn btn-primary" id="next-hand-btn">Deal New Hand</button>
+    </div>
+
+    <div class="presets-section">
+      <div class="section-label">Practice Scenarios</div>
+      <button class="preset-btn" data-preset="overpair-flush">
+        <div class="preset-name">Overpair vs Flush Draw</div>
+        <div class="preset-desc">AA vs suited connectors on a two-tone flop</div>
+      </button>
+      <button class="preset-btn" data-preset="set-oesd">
+        <div class="preset-name">Set vs Open-Ended Straight Draw</div>
+        <div class="preset-desc">Middle set vs connected cards on a coordinated board</div>
+      </button>
+      <button class="preset-btn" data-preset="toppair-twopair">
+        <div class="preset-name">Top Pair vs Two Pair</div>
+        <div class="preset-desc">TPTK vs bottom two pair on the flop</div>
+      </button>
+      <button class="preset-btn" data-preset="overpair-underpair">
+        <div class="preset-name">Overpair vs Underpair</div>
+        <div class="preset-desc">Kings vs tens on a low board</div>
+      </button>
+      <button class="preset-btn" data-preset="flushdraw-pair">
+        <div class="preset-name">Flush Draw vs Top Pair</div>
+        <div class="preset-desc">Nut flush draw vs top pair on the flop</div>
+      </button>
+      <button class="preset-btn" data-preset="ak-vs-pair">
+        <div class="preset-name">AK vs Small Pair</div>
+        <div class="preset-desc">Big slick vs pocket pair preflop (3 card board)</div>
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- Card Picker Overlay -->
+<div class="picker-overlay" id="picker-overlay">
+  <div class="picker-panel">
+    <div class="picker-header">
+      <h3 id="picker-title">Select a Card</h3>
+      <button class="picker-close" id="picker-close">&times;</button>
+    </div>
+    <div id="picker-grid"></div>
+  </div>
+</div>
+
+<a href="../" class="home-link">&larr; All Apps</a>
+
+<script>
+// ---- CONSTANTS ----
+const RANKS = ['A','K','Q','J','T','9','8','7','6','5','4','3','2'];
+const SUITS = [{s:'s',name:'Spades',sym:'\u2660',color:'black'},{s:'h',name:'Hearts',sym:'\u2665',color:'red'},{s:'d',name:'Diamonds',sym:'\u2666',color:'red'},{s:'c',name:'Clubs',sym:'\u2663',color:'black'}];
+const RANK_ORDER = {A:14,K:13,Q:12,J:11,T:10,9:9,8:8,7:7,6:6,5:5,4:4,3:3,2:2};
+const MAX_ITERS = 100000;
+
+// ---- STATE ----
+let heroCards = [null, null];
+let villainCards = [null, null];
+let boardCards = [null, null, null, null, null];
+let villainMode = 'random';
+let pickerTarget = null; // {area:'hero'|'villain'|'board', index:number}
+let worker = null;
+let isRunning = false;
+
+// Quiz state
+let quizHero = [];
+let quizBoard = [];
+let quizActualEquity = null;
+let quizGuessed = false;
+let quizStats = JSON.parse(localStorage.getItem('pokerQuizStats') || '{"score":0,"hands":0,"streak":0,"history":[]}');
+
+// ---- UTILITY ----
+function cardId(rank, suit) { return rank + suit; }
+function parseCard(id) { return {rank: id[0], suit: id[1]}; }
+function suitInfo(s) { return SUITS.find(x => x.s === s); }
+function isRed(s) { return s === 'h' || s === 'd'; }
+
+function allSelectedCards() {
+  const cards = [];
+  heroCards.forEach(c => { if (c) cards.push(c); });
+  if (villainMode === 'specific') villainCards.forEach(c => { if (c) cards.push(c); });
+  boardCards.forEach(c => { if (c) cards.push(c); });
+  return cards;
+}
+
+function createMiniCard(cardStr) {
+  const {rank, suit} = parseCard(cardStr);
+  const si = suitInfo(suit);
+  const div = document.createElement('div');
+  div.className = 'mini-card ' + si.color;
+  div.innerHTML = `<span class="rank">${rank}</span><span class="suit">${si.sym}</span>`;
+  return div;
+}
+
+// ---- CARD PICKER ----
+function buildPickerGrid() {
+  const grid = document.getElementById('picker-grid');
+  grid.innerHTML = '';
+  const used = new Set(allSelectedCards());
+
+  for (const si of SUITS) {
+    const section = document.createElement('div');
+    section.className = 'suit-section';
+    section.innerHTML = `<div class="suit-section-label"><span class="suit-icon ${si.color}">${si.sym}</span> ${si.name}</div>`;
+    const row = document.createElement('div');
+    row.className = 'picker-row';
+    for (const r of RANKS) {
+      const id = cardId(r, si.s);
+      const btn = document.createElement('button');
+      btn.className = 'pick-card ' + si.color;
+      if (used.has(id)) btn.classList.add('used');
+      btn.innerHTML = `<span class="rank">${r}</span><span class="suit">${si.sym}</span>`;
+      btn.dataset.card = id;
+      btn.addEventListener('click', () => pickCard(id));
+      row.appendChild(btn);
+    }
+    section.appendChild(row);
+    grid.appendChild(section);
+  }
+}
+
+function openPicker(area, index) {
+  pickerTarget = {area, index};
+  const overlay = document.getElementById('picker-overlay');
+  const title = document.getElementById('picker-title');
+  const labels = {hero:'Your Hand', villain:'Villain Hand', board:'Community Card'};
+  title.textContent = 'Select ' + labels[area] + ' ' + (index + 1);
+  buildPickerGrid();
+  overlay.classList.add('open');
+}
+
+function closePicker() {
+  document.getElementById('picker-overlay').classList.remove('open');
+  pickerTarget = null;
+}
+
+function pickCard(cardStr) {
+  if (!pickerTarget) return;
+  if (allSelectedCards().includes(cardStr)) return;
+  const {area, index} = pickerTarget;
+  if (area === 'hero') heroCards[index] = cardStr;
+  else if (area === 'villain') villainCards[index] = cardStr;
+  else if (area === 'board') boardCards[index] = cardStr;
+  closePicker();
+  renderSlots();
+  updateCalcBtn();
+}
+
+function removeCard(area, index) {
+  if (area === 'hero') heroCards[index] = null;
+  else if (area === 'villain') villainCards[index] = null;
+  else if (area === 'board') boardCards[index] = null;
+  renderSlots();
+  updateCalcBtn();
+  stopWorker();
+}
+
+function renderSlots() {
+  renderSlotGroup('hero-slots', heroCards, 'hero');
+  renderSlotGroup('villain-slots', villainCards, 'villain');
+  renderSlotGroup('board-slots', boardCards, 'board');
+}
+
+function renderSlotGroup(containerId, cards, area) {
+  const container = document.getElementById(containerId);
+  const slots = container.querySelectorAll('.card-slot');
+  slots.forEach((slot, i) => {
+    slot.innerHTML = '';
+    if (cards[i]) {
+      slot.classList.add('filled');
+      slot.appendChild(createMiniCard(cards[i]));
+      const x = document.createElement('div');
+      x.className = 'remove-x';
+      x.textContent = '\u00d7';
+      x.addEventListener('click', (e) => { e.stopPropagation(); removeCard(area, i); });
+      slot.appendChild(x);
+      slot.onclick = null;
+    } else {
+      slot.classList.remove('filled');
+      slot.innerHTML = '<span>+</span>';
+    }
+  });
+}
+
+// Slot click handlers
+document.querySelectorAll('.card-slot').forEach(slot => {
+  slot.addEventListener('click', function() {
+    if (this.classList.contains('filled')) return;
+    openPicker(this.dataset.target, parseInt(this.dataset.index));
+  });
+});
+
+document.getElementById('picker-close').addEventListener('click', closePicker);
+document.getElementById('picker-overlay').addEventListener('click', (e) => {
+  if (e.target === document.getElementById('picker-overlay')) closePicker();
+});
+
+// ---- VILLAIN MODE ----
+document.querySelectorAll('.range-toggle button').forEach(btn => {
+  btn.addEventListener('click', function() {
+    document.querySelectorAll('.range-toggle button').forEach(b => b.classList.remove('active'));
+    this.classList.add('active');
+    villainMode = this.dataset.mode;
+    document.getElementById('villain-slots').style.display = villainMode === 'specific' ? 'flex' : 'none';
+    document.getElementById('villain-random-label').style.display = villainMode === 'random' ? 'block' : 'none';
+    if (villainMode === 'random') { villainCards = [null, null]; renderSlots(); }
+    updateCalcBtn();
+    stopWorker();
+  });
+});
+
+// ---- TABS ----
+document.querySelectorAll('.tab-btn').forEach(btn => {
+  btn.addEventListener('click', function() {
+    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+    document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+    this.classList.add('active');
+    document.getElementById('tab-' + this.dataset.tab).classList.add('active');
+    if (this.dataset.tab === 'quiz') updateQuizStats();
+  });
+});
+
+// ---- CALCULATE ----
+function updateCalcBtn() {
+  const btn = document.getElementById('calc-btn');
+  const heroReady = heroCards[0] && heroCards[1];
+  const villainReady = villainMode === 'random' || (villainCards[0] && villainCards[1]);
+  btn.disabled = !(heroReady && villainReady);
+}
+
+function clearAll() {
+  heroCards = [null, null];
+  villainCards = [null, null];
+  boardCards = [null, null, null, null, null];
+  renderSlots();
+  updateCalcBtn();
+  stopWorker();
+  document.getElementById('results-panel').style.display = 'none';
+}
+
+document.getElementById('clear-btn').addEventListener('click', clearAll);
+
+document.getElementById('calc-btn').addEventListener('click', () => {
+  if (isRunning) { stopWorker(); return; }
+  startCalculation();
+});
+
+// ---- WEB WORKER (Monte Carlo) ----
+function getWorkerCode() {
+  return `
+const RANKS_W = ['2','3','4','5','6','7','8','9','T','J','Q','K','A'];
+const SUITS_W = ['s','h','d','c'];
+const RANK_VAL = {};
+RANKS_W.forEach((r,i) => RANK_VAL[r] = i+2);
+
+function makeDeck() {
+  const d = [];
+  for (const r of RANKS_W) for (const s of SUITS_W) d.push(r+s);
+  return d;
+}
+
+function shuffle(arr) {
+  for (let i = arr.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [arr[i], arr[j]] = [arr[j], arr[i]];
+  }
+  return arr;
+}
+
+function handRank(seven) {
+  // Evaluate best 5-card hand from 7 cards
+  // Returns [category, ...tiebreakers] where category 0=high..8=straight flush
+  const cards = seven.map(c => ({r: RANK_VAL[c[0]], s: c[1]}));
+  let best = null;
+
+  // Generate all 21 combos of 5 from 7
+  for (let i = 0; i < 7; i++) {
+    for (let j = i+1; j < 7; j++) {
+      const five = [];
+      for (let k = 0; k < 7; k++) if (k !== i && k !== j) five.push(cards[k]);
+      const score = eval5(five);
+      if (!best || comparH(score, best) > 0) best = score;
+    }
+  }
+  return best;
+}
+
+function eval5(cards) {
+  const rs = cards.map(c => c.r).sort((a,b) => b-a);
+  const suits = cards.map(c => c.s);
+  const flush = suits.every(s => s === suits[0]);
+
+  // Count ranks
+  const counts = {};
+  rs.forEach(r => counts[r] = (counts[r]||0) + 1);
+  const groups = Object.entries(counts).map(([r,c]) => ({r:parseInt(r),c}));
+  groups.sort((a,b) => b.c - a.c || b.r - a.r);
+
+  const isSeq = (rs[0]-rs[4]===4) && new Set(rs).size===5;
+  const isWheel = rs[0]===14 && rs[1]===5 && rs[2]===4 && rs[3]===3 && rs[4]===2;
+  const straight = isSeq || isWheel;
+  const straightHigh = isWheel ? 5 : rs[0];
+
+  if (flush && straight) return [8, straightHigh];
+  if (groups[0].c === 4) return [7, groups[0].r, groups[1].r];
+  if (groups[0].c === 3 && groups[1].c === 2) return [6, groups[0].r, groups[1].r];
+  if (flush) return [5, ...rs];
+  if (straight) return [4, straightHigh];
+  if (groups[0].c === 3) return [3, groups[0].r, groups[1].r, groups[2].r];
+  if (groups[0].c === 2 && groups[1].c === 2) {
+    const p1 = Math.max(groups[0].r, groups[1].r);
+    const p2 = Math.min(groups[0].r, groups[1].r);
+    return [2, p1, p2, groups[2].r];
+  }
+  if (groups[0].c === 2) return [1, groups[0].r, groups[1].r, groups[2].r, groups[3].r];
+  return [0, ...rs];
+}
+
+function comparH(a, b) {
+  for (let i = 0; i < Math.max(a.length, b.length); i++) {
+    if ((a[i]||0) > (b[i]||0)) return 1;
+    if ((a[i]||0) < (b[i]||0)) return -1;
+  }
+  return 0;
+}
+
+self.onmessage = function(e) {
+  const {hero, villain, board, villainMode, totalIters} = e.data;
+  const usedCards = new Set([...hero, ...board.filter(Boolean)]);
+  if (villainMode === 'specific') villain.forEach(c => usedCards.add(c));
+
+  let wins = 0, ties = 0, total = 0;
+  const BATCH = 2000;
+
+  function runBatch() {
+    for (let b = 0; b < BATCH && total < totalIters; b++, total++) {
+      const deck = makeDeck().filter(c => !usedCards.has(c));
+      shuffle(deck);
+      let di = 0;
+
+      // Deal villain if random
+      let vCards;
+      if (villainMode === 'random') {
+        vCards = [deck[di++], deck[di++]];
+      } else {
+        vCards = [...villain];
+      }
+
+      // Complete board
+      const fullBoard = [...board];
+      for (let i = 0; i < 5; i++) {
+        if (!fullBoard[i]) fullBoard[i] = deck[di++];
+      }
+
+      const heroHand = handRank([...hero, ...fullBoard]);
+      const villHand = handRank([...vCards, ...fullBoard]);
+      const cmp = comparH(heroHand, villHand);
+      if (cmp > 0) wins++;
+      else if (cmp === 0) ties++;
+    }
+
+    const winPct = (wins / total * 100);
+    const tiePct = (ties / total * 100);
+    const equity = winPct + tiePct / 2;
+
+    self.postMessage({wins, ties, total, winPct, tiePct, equity, done: total >= totalIters});
+
+    if (total < totalIters) {
+      setTimeout(runBatch, 0);
+    }
+  }
+
+  runBatch();
+};
+`;
+}
+
+function startCalculation() {
+  stopWorker();
+  const blob = new Blob([getWorkerCode()], {type: 'application/javascript'});
+  const url = URL.createObjectURL(blob);
+  worker = new Worker(url);
+  URL.revokeObjectURL(url);
+  isRunning = true;
+
+  const btn = document.getElementById('calc-btn');
+  btn.textContent = 'Stop';
+  btn.classList.remove('btn-primary');
+  btn.classList.add('btn-danger');
+
+  const panel = document.getElementById('results-panel');
+  panel.style.display = 'block';
+  panel.classList.add('fade-in');
+
+  const board = boardCards.filter(Boolean);
+  worker.postMessage({
+    hero: heroCards.filter(Boolean),
+    villain: villainCards.filter(Boolean),
+    board: boardCards.map(c => c || null),
+    villainMode,
+    totalIters: MAX_ITERS
+  });
+
+  worker.onmessage = function(e) {
+    const {winPct, tiePct, equity, total, done} = e.data;
+    document.getElementById('res-win').textContent = winPct.toFixed(1) + '%';
+    document.getElementById('res-tie').textContent = tiePct.toFixed(1) + '%';
+    document.getElementById('res-equity').textContent = equity.toFixed(1) + '%';
+    document.getElementById('iter-count').textContent = total.toLocaleString() + ' / ' + MAX_ITERS.toLocaleString() + ' simulations';
+    document.getElementById('progress-fill').style.width = (total / MAX_ITERS * 100) + '%';
+    if (done) stopWorker();
+  };
+}
+
+function stopWorker() {
+  if (worker) { worker.terminate(); worker = null; }
+  isRunning = false;
+  const btn = document.getElementById('calc-btn');
+  btn.textContent = 'Calculate Equity';
+  btn.classList.add('btn-primary');
+  btn.classList.remove('btn-danger');
+}
+
+// ---- Return equity as promise for quiz ----
+function calcEquity(hero, board, iters) {
+  return new Promise((resolve) => {
+    const blob = new Blob([getWorkerCode()], {type: 'application/javascript'});
+    const url = URL.createObjectURL(blob);
+    const w = new Worker(url);
+    URL.revokeObjectURL(url);
+    w.postMessage({
+      hero, villain: [], board: board.concat(Array(5 - board.length).fill(null)),
+      villainMode: 'random', totalIters: iters
+    });
+    w.onmessage = function(e) {
+      if (e.data.done) { w.terminate(); resolve(e.data.equity); }
+    };
+  });
+}
+
+// ---- QUIZ ----
+function randomDeck() {
+  const d = [];
+  for (const r of RANKS) for (const si of SUITS) d.push(r + si.s);
+  for (let i = d.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [d[i], d[j]] = [d[j], d[i]];
+  }
+  return d;
+}
+
+function dealQuizHand() {
+  quizGuessed = false;
+  quizActualEquity = null;
+  document.getElementById('quiz-result').innerHTML = '';
+  document.querySelectorAll('.eq-btn').forEach(b => { b.className = 'eq-btn'; b.disabled = false; });
+
+  const deck = randomDeck();
+  quizHero = [deck[0], deck[1]];
+  const boardLen = Math.random() < 0.5 ? 3 : 4; // flop or turn
+  quizBoard = deck.slice(2, 2 + boardLen);
+
+  document.getElementById('quiz-board-label').textContent = boardLen === 3 ? 'Flop' : 'Turn';
+  renderQuizCards();
+}
+
+const PRESETS = {
+  'overpair-flush': () => {
+    const deck = randomDeck();
+    quizHero = ['As','Ah'];
+    quizBoard = ['7h','9h','3d'];
+    quizGuessed = false; quizActualEquity = null;
+    document.getElementById('quiz-board-label').textContent = 'Flop';
+  },
+  'set-oesd': () => {
+    quizHero = ['8s','8h'];
+    quizBoard = ['8d','9c','Ts'];
+    quizGuessed = false; quizActualEquity = null;
+    document.getElementById('quiz-board-label').textContent = 'Flop';
+  },
+  'toppair-twopair': () => {
+    quizHero = ['Ah','Kd'];
+    quizBoard = ['Ac','7s','3h'];
+    quizGuessed = false; quizActualEquity = null;
+    document.getElementById('quiz-board-label').textContent = 'Flop';
+  },
+  'overpair-underpair': () => {
+    quizHero = ['Kh','Ks'];
+    quizBoard = ['7d','4c','2s'];
+    quizGuessed = false; quizActualEquity = null;
+    document.getElementById('quiz-board-label').textContent = 'Flop';
+  },
+  'flushdraw-pair': () => {
+    quizHero = ['Ah','Th'];
+    quizBoard = ['Kh','7h','3c'];
+    quizGuessed = false; quizActualEquity = null;
+    document.getElementById('quiz-board-label').textContent = 'Flop';
+  },
+  'ak-vs-pair': () => {
+    quizHero = ['As','Kd'];
+    quizBoard = ['9c','5h','2d'];
+    quizGuessed = false; quizActualEquity = null;
+    document.getElementById('quiz-board-label').textContent = 'Flop';
+  }
+};
+
+function loadPreset(name) {
+  PRESETS[name]();
+  document.getElementById('quiz-result').innerHTML = '';
+  document.querySelectorAll('.eq-btn').forEach(b => { b.className = 'eq-btn'; b.disabled = false; });
+  renderQuizCards();
+}
+
+function renderQuizCards() {
+  const heroDiv = document.getElementById('quiz-hero-cards');
+  heroDiv.innerHTML = '';
+  quizHero.forEach(c => heroDiv.appendChild(createMiniCard(c)));
+
+  const boardDiv = document.getElementById('quiz-board-cards');
+  boardDiv.innerHTML = '';
+  quizBoard.forEach(c => boardDiv.appendChild(createMiniCard(c)));
+}
+
+document.querySelectorAll('.eq-btn').forEach(btn => {
+  btn.addEventListener('click', async function() {
+    if (quizGuessed) return;
+    quizGuessed = true;
+    const guess = parseInt(this.dataset.range);
+
+    document.querySelectorAll('.eq-btn').forEach(b => b.disabled = true);
+    this.classList.add('selected');
+
+    // Calculate actual equity
+    const resultDiv = document.getElementById('quiz-result');
+    resultDiv.innerHTML = '<div class="quiz-result ok">Calculating equity...</div>';
+
+    const equity = await calcEquity(quizHero, quizBoard, 30000);
+    quizActualEquity = equity;
+
+    const actualBucket = Math.min(4, Math.floor(equity / 20));
+    const diff = Math.abs(guess - actualBucket);
+
+    // Score: 0 diff = 10pts, 1 diff = 5pts, 2 diff = 2pts, 3+ = 0
+    const pts = diff === 0 ? 10 : diff === 1 ? 5 : diff === 2 ? 2 : 0;
+
+    // Mark buttons
+    document.querySelectorAll('.eq-btn').forEach(b => {
+      const r = parseInt(b.dataset.range);
+      if (r === actualBucket) b.classList.add('actual');
+    });
+    if (guess !== actualBucket) this.classList.add('wrong');
+    else this.classList.add('correct');
+
+    // Update stats
+    quizStats.score += pts;
+    quizStats.hands++;
+    if (diff <= 1) quizStats.streak++;
+    else quizStats.streak = 0;
+    quizStats.history.push(pts);
+    if (quizStats.history.length > 100) quizStats.history.shift();
+    localStorage.setItem('pokerQuizStats', JSON.stringify(quizStats));
+    updateQuizStats();
+
+    const cls = pts >= 10 ? 'good' : pts >= 5 ? 'ok' : 'bad';
+    const msg = pts >= 10 ? 'Nailed it!' : pts >= 5 ? 'Close!' : pts >= 2 ? 'Not bad' : 'Way off!';
+    resultDiv.innerHTML = `<div class="quiz-result ${cls} fade-in">
+      ${msg}<span class="actual-eq">${equity.toFixed(1)}% equity</span>
+      <span class="points">+${pts} points</span>
+    </div>`;
+  });
+});
+
+function updateQuizStats() {
+  document.getElementById('q-score').textContent = quizStats.score;
+  document.getElementById('q-hands').textContent = quizStats.hands;
+  document.getElementById('q-streak').textContent = quizStats.streak;
+  const avg = quizStats.history.length > 0
+    ? (quizStats.history.reduce((a,b)=>a+b,0) / quizStats.history.length).toFixed(1)
+    : '--';
+  document.getElementById('q-avg').textContent = avg;
+}
+
+document.getElementById('next-hand-btn').addEventListener('click', dealQuizHand);
+document.querySelectorAll('.preset-btn').forEach(btn => {
+  btn.addEventListener('click', function() { loadPreset(this.dataset.preset); });
+});
+
+// ---- INIT ----
+renderSlots();
+updateCalcBtn();
+updateQuizStats();
+dealQuizHand();
+</script>
+</body>
+</html>

@@ -1,0 +1,777 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>Garage Gym Timer</title>
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --bg: #111;
+  --surface: #1a1a1a;
+  --border: #333;
+  --text: #eee;
+  --text-dim: #888;
+  --green: #00e676;
+  --blue: #42a5f5;
+  --red: #ff1744;
+  --orange: #ff9100;
+  --yellow: #ffd600;
+}
+
+html, body {
+  height: 100%;
+  background: var(--bg);
+  color: var(--text);
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+  overflow-x: hidden;
+  -webkit-tap-highlight-color: transparent;
+}
+
+body { display: flex; flex-direction: column; min-height: 100vh; }
+
+/* ---- Screens ---- */
+.screen { display: none; flex-direction: column; flex: 1; }
+.screen.active { display: flex; }
+
+/* ---- Header ---- */
+.header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 0.75rem 1rem; border-bottom: 1px solid var(--border);
+}
+.header h1 { font-size: 1.1rem; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase; }
+.header-actions { display: flex; gap: 0.5rem; }
+
+/* ---- Buttons ---- */
+button {
+  background: var(--surface); color: var(--text); border: 1px solid var(--border);
+  border-radius: 0.5rem; padding: 0.6rem 1rem; font-size: 0.95rem;
+  cursor: pointer; transition: background 0.15s, border-color 0.15s;
+  font-family: inherit; touch-action: manipulation;
+}
+button:hover { background: #252525; border-color: #555; }
+button:active { background: #333; }
+button.primary { background: var(--green); color: #000; border-color: var(--green); font-weight: 700; }
+button.primary:hover { background: #00c864; }
+button.danger { background: var(--red); color: #fff; border-color: var(--red); }
+button.small { padding: 0.4rem 0.7rem; font-size: 0.8rem; }
+button.icon-btn { padding: 0.5rem; font-size: 1.2rem; line-height: 1; min-width: 2.2rem; text-align: center; }
+
+/* ---- Mode Selection ---- */
+.mode-grid {
+  display: grid; grid-template-columns: 1fr 1fr;
+  gap: 0.75rem; padding: 1rem; flex: 1; align-content: start;
+}
+.mode-card {
+  background: var(--surface); border: 1px solid var(--border); border-radius: 0.75rem;
+  padding: 1.25rem; cursor: pointer; transition: border-color 0.15s, transform 0.1s;
+  display: flex; flex-direction: column; gap: 0.3rem;
+}
+.mode-card:hover { border-color: var(--green); }
+.mode-card:active { transform: scale(0.97); }
+.mode-card .mode-icon { font-size: 1.8rem; margin-bottom: 0.25rem; }
+.mode-card .mode-name { font-weight: 700; font-size: 1rem; }
+.mode-card .mode-desc { font-size: 0.75rem; color: var(--text-dim); line-height: 1.3; }
+
+/* ---- Presets Section ---- */
+.section-label {
+  font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.1em;
+  color: var(--text-dim); padding: 0.75rem 1rem 0.25rem;
+}
+.preset-list { display: flex; flex-direction: column; gap: 0.5rem; padding: 0 1rem 1rem; }
+.preset-item {
+  background: var(--surface); border: 1px solid var(--border); border-radius: 0.5rem;
+  padding: 0.75rem 1rem; display: flex; justify-content: space-between; align-items: center;
+  cursor: pointer; transition: border-color 0.15s;
+}
+.preset-item:hover { border-color: var(--green); }
+.preset-item .preset-name { font-weight: 600; font-size: 0.9rem; }
+.preset-item .preset-detail { font-size: 0.75rem; color: var(--text-dim); }
+.preset-item .preset-actions { display: flex; gap: 0.3rem; }
+
+/* ---- Config Screen ---- */
+.config-body { padding: 1rem; flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 1rem; }
+.config-row { display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; }
+.config-row label { font-size: 0.85rem; color: var(--text-dim); }
+.config-row input, .config-row select {
+  background: var(--surface); color: var(--text); border: 1px solid var(--border);
+  border-radius: 0.4rem; padding: 0.5rem 0.6rem; font-size: 1rem; width: 5rem; text-align: center;
+  font-family: inherit;
+}
+.config-row input:focus, .config-row select:focus { outline: none; border-color: var(--green); }
+.config-actions { display: flex; gap: 0.75rem; padding: 1rem; }
+.config-actions button { flex: 1; }
+
+/* ---- Custom Segments ---- */
+.segment-list { display: flex; flex-direction: column; gap: 0.5rem; }
+.segment-row {
+  display: flex; gap: 0.5rem; align-items: center; background: var(--surface);
+  border: 1px solid var(--border); border-radius: 0.4rem; padding: 0.5rem;
+}
+.segment-row input[type="text"] { flex: 1; min-width: 0; }
+.segment-row input { background: #222; color: var(--text); border: 1px solid var(--border); border-radius: 0.3rem; padding: 0.4rem; font-size: 0.85rem; font-family: inherit; }
+.segment-row input[type="number"] { width: 3.5rem; text-align: center; }
+.segment-row select { background: #222; color: var(--text); border: 1px solid var(--border); border-radius: 0.3rem; padding: 0.4rem; font-size: 0.8rem; font-family: inherit; }
+
+/* ---- Timer Screen ---- */
+.timer-screen { background: var(--bg); position: relative; }
+.timer-phase {
+  text-align: center; font-size: 1.2rem; font-weight: 700;
+  text-transform: uppercase; letter-spacing: 0.15em; padding: 0.75rem;
+  min-height: 3rem; display: flex; align-items: center; justify-content: center;
+}
+.timer-round {
+  text-align: center; font-size: 0.9rem; color: var(--text-dim);
+  letter-spacing: 0.1em; padding-bottom: 0.25rem;
+}
+.timer-display {
+  flex: 1; display: flex; align-items: center; justify-content: center;
+  font-size: 30vw; font-weight: 900; font-variant-numeric: tabular-nums;
+  letter-spacing: -0.02em; line-height: 1; padding: 0 0.5rem;
+  transition: color 0.2s;
+  user-select: none;
+}
+.timer-display.color-work { color: var(--green); }
+.timer-display.color-rest { color: var(--blue); }
+.timer-display.color-countdown { color: var(--red); }
+.timer-display.color-done { color: var(--yellow); }
+
+.progress-container { padding: 0 1rem; height: 0.5rem; }
+.progress-bar {
+  height: 100%; background: #333; border-radius: 0.25rem; overflow: hidden;
+}
+.progress-fill {
+  height: 100%; background: var(--green); border-radius: 0.25rem;
+  transition: width 0.3s linear;
+}
+
+.timer-controls {
+  display: flex; gap: 0.75rem; padding: 1rem; justify-content: center;
+  padding-bottom: calc(1rem + 2.5rem);
+}
+.timer-controls button { min-width: 5rem; font-size: 1rem; padding: 0.8rem 1.5rem; }
+
+/* ---- Rep Counter ---- */
+.rep-screen { text-align: center; }
+.rep-count {
+  font-size: 25vw; font-weight: 900; color: var(--orange);
+  flex: 1; display: flex; align-items: center; justify-content: center;
+}
+.rep-label { font-size: 1.2rem; color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.1em; }
+.rep-instructions {
+  padding: 1rem; font-size: 0.8rem; color: var(--text-dim); line-height: 1.5;
+  background: var(--surface); margin: 0.5rem 1rem; border-radius: 0.5rem;
+}
+
+/* ---- Back button ---- */
+.back-btn { background: none; border: none; font-size: 1.3rem; padding: 0.3rem 0.5rem; color: var(--text); }
+.back-btn:hover { background: none; color: var(--green); }
+
+/* ---- Home link ---- */
+.home-link {
+  position: fixed; bottom: 1.25rem; left: 50%; transform: translateX(-50%);
+  font-size: 0.8rem; color: rgba(255,255,255,0.35); text-decoration: none;
+  z-index: 10; transition: color 0.15s;
+}
+.home-link:hover { color: rgba(255,255,255,0.7); }
+
+/* ---- Fullscreen tweak ---- */
+:fullscreen { background: var(--bg); }
+
+/* ---- Responsive ---- */
+@media (max-width: 400px) {
+  .timer-display { font-size: 28vw; }
+  .mode-grid { grid-template-columns: 1fr; }
+}
+@media (min-width: 768px) {
+  .timer-display { font-size: 22vw; }
+}
+</style>
+</head>
+<body>
+
+<!-- ==================== HOME SCREEN ==================== -->
+<div id="homeScreen" class="screen active">
+  <div class="header">
+    <h1>Garage Gym Timer</h1>
+    <div class="header-actions">
+      <button class="icon-btn" onclick="toggleFullscreen()" title="Fullscreen">&#x26F6;</button>
+    </div>
+  </div>
+
+  <div class="section-label">Timer Modes</div>
+  <div class="mode-grid">
+    <div class="mode-card" onclick="openConfig('hiit')">
+      <div class="mode-icon">&#9201;</div>
+      <div class="mode-name">HIIT</div>
+      <div class="mode-desc">Work/rest intervals, configurable rounds</div>
+    </div>
+    <div class="mode-card" onclick="openConfig('tabata')">
+      <div class="mode-icon">&#9889;</div>
+      <div class="mode-name">Tabata</div>
+      <div class="mode-desc">20s work / 10s rest / 8 rounds</div>
+    </div>
+    <div class="mode-card" onclick="openConfig('emom')">
+      <div class="mode-icon">&#128339;</div>
+      <div class="mode-name">EMOM</div>
+      <div class="mode-desc">Every Minute on the Minute</div>
+    </div>
+    <div class="mode-card" onclick="openConfig('custom')">
+      <div class="mode-icon">&#9881;</div>
+      <div class="mode-name">Custom</div>
+      <div class="mode-desc">Named segments, any duration</div>
+    </div>
+  </div>
+
+  <div class="section-label">Presets</div>
+  <div id="presetList" class="preset-list"></div>
+
+  <div style="padding: 0 1rem 1rem;">
+    <div class="mode-card" onclick="openRepCounter()" style="flex-direction:row;align-items:center;gap:0.75rem;">
+      <div class="mode-icon" style="margin:0">&#128170;</div>
+      <div>
+        <div class="mode-name">Rep Counter</div>
+        <div class="mode-desc">Motion-based counting via DeviceMotion</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ==================== CONFIG SCREEN ==================== -->
+<div id="configScreen" class="screen">
+  <div class="header">
+    <button class="back-btn" onclick="showScreen('homeScreen')">&larr;</button>
+    <h1 id="configTitle">Configure</h1>
+    <div style="width:2rem"></div>
+  </div>
+  <div id="configBody" class="config-body"></div>
+  <div class="config-actions">
+    <button onclick="saveAsPreset()">Save Preset</button>
+    <button class="primary" onclick="startTimer()">Start</button>
+  </div>
+</div>
+
+<!-- ==================== TIMER SCREEN ==================== -->
+<div id="timerScreen" class="screen timer-screen">
+  <div class="timer-phase" id="timerPhase">GET READY</div>
+  <div class="timer-round" id="timerRound"></div>
+  <div class="timer-display color-work" id="timerDisplay">0:00</div>
+  <div class="progress-container">
+    <div class="progress-bar"><div class="progress-fill" id="progressFill" style="width:0%"></div></div>
+  </div>
+  <div class="timer-controls">
+    <button onclick="stopTimer()">Stop</button>
+    <button class="primary" id="pauseBtn" onclick="togglePause()">Pause</button>
+  </div>
+</div>
+
+<!-- ==================== REP COUNTER SCREEN ==================== -->
+<div id="repScreen" class="screen rep-screen">
+  <div class="header">
+    <button class="back-btn" onclick="stopRepCounter();showScreen('homeScreen')">&larr;</button>
+    <h1>Rep Counter</h1>
+    <div style="width:2rem"></div>
+  </div>
+  <div class="rep-label">Reps</div>
+  <div class="rep-count" id="repCount">0</div>
+  <div class="rep-instructions">
+    <strong>How to use:</strong><br>
+    1. Tap "Start Counting" below<br>
+    2. Hold your phone or put it in your pocket<br>
+    3. Perform reps with clear up/down motion<br>
+    4. Each rep is detected via accelerometer
+  </div>
+  <div style="display:flex;gap:0.75rem;padding:1rem;justify-content:center;padding-bottom:calc(1rem+2.5rem)">
+    <button id="repResetBtn" onclick="resetReps()">Reset</button>
+    <button class="primary" id="repToggleBtn" onclick="toggleRepCounter()">Start Counting</button>
+  </div>
+</div>
+
+<a href="../" class="home-link">&larr; All Apps</a>
+
+<script>
+/* ================================================================
+   AUDIO — Web Audio API beeps
+   ================================================================ */
+let audioCtx = null;
+function getAudioCtx() {
+  if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  return audioCtx;
+}
+
+function beep(freq = 880, duration = 0.15, vol = 0.5) {
+  try {
+    const ctx = getAudioCtx();
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.type = 'square';
+    osc.frequency.setValueAtTime(freq, ctx.currentTime);
+    gain.gain.setValueAtTime(vol, ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + duration);
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    osc.start(ctx.currentTime);
+    osc.stop(ctx.currentTime + duration);
+  } catch(e) {}
+}
+
+function beepHigh() { beep(1200, 0.12, 0.6); }
+function beepLow() { beep(440, 0.2, 0.5); }
+function beepDouble() { beep(1000, 0.1, 0.6); setTimeout(() => beep(1000, 0.1, 0.6), 150); }
+function beepTriple() { beep(1200, 0.1, 0.7); setTimeout(() => beep(1200, 0.1, 0.7), 150); setTimeout(() => beep(1500, 0.25, 0.8), 300); }
+function beepCountdown() { beep(700, 0.08, 0.5); }
+
+/* ================================================================
+   SPEECH — Web Speech API
+   ================================================================ */
+function speak(text) {
+  try {
+    if (!('speechSynthesis' in window)) return;
+    const u = new SpeechSynthesisUtterance(text);
+    u.rate = 1.1;
+    u.volume = 1;
+    speechSynthesis.speak(u);
+  } catch(e) {}
+}
+
+/* ================================================================
+   SCREEN NAV
+   ================================================================ */
+function showScreen(id) {
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+}
+
+/* ================================================================
+   FULLSCREEN
+   ================================================================ */
+function toggleFullscreen() {
+  if (!document.fullscreenElement) {
+    document.documentElement.requestFullscreen().catch(() => {});
+  } else {
+    document.exitFullscreen().catch(() => {});
+  }
+}
+
+/* ================================================================
+   PRESETS
+   ================================================================ */
+const BUILTIN_PRESETS = [
+  { name: 'Tabata Classic', mode: 'tabata', config: { work: 20, rest: 10, rounds: 8 } },
+  { name: 'Boxing Rounds', mode: 'hiit', config: { work: 180, rest: 60, rounds: 12 } },
+  { name: '5-3-1 Rest Timer', mode: 'custom', config: { segments: [
+    { name: 'Set 1 Rest', duration: 180, type: 'rest' },
+    { name: 'Set 2 Rest', duration: 180, type: 'rest' },
+    { name: 'Set 3 Rest', duration: 180, type: 'rest' },
+    { name: 'AMRAP Rest', duration: 120, type: 'rest' },
+    { name: 'Accessory Rest', duration: 90, type: 'rest' },
+  ]}},
+];
+
+function getUserPresets() {
+  try { return JSON.parse(localStorage.getItem('gym_timer_presets') || '[]'); } catch(e) { return []; }
+}
+function saveUserPresets(p) {
+  localStorage.setItem('gym_timer_presets', JSON.stringify(p));
+}
+
+function renderPresets() {
+  const el = document.getElementById('presetList');
+  const all = [...BUILTIN_PRESETS, ...getUserPresets()];
+  if (all.length === 0) { el.innerHTML = '<div style="color:var(--text-dim);font-size:0.8rem;padding:0.5rem 0">No presets yet</div>'; return; }
+  el.innerHTML = all.map((p, i) => {
+    const isUser = i >= BUILTIN_PRESETS.length;
+    const userIdx = i - BUILTIN_PRESETS.length;
+    return `<div class="preset-item" onclick="loadPreset(${i})">
+      <div>
+        <div class="preset-name">${esc(p.name)}</div>
+        <div class="preset-detail">${p.mode.toUpperCase()}</div>
+      </div>
+      <div class="preset-actions">
+        ${isUser ? `<button class="small" onclick="event.stopPropagation();deletePreset(${userIdx})">&#10005;</button>` : ''}
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function loadPreset(idx) {
+  const all = [...BUILTIN_PRESETS, ...getUserPresets()];
+  const p = all[idx];
+  if (!p) return;
+  currentMode = p.mode;
+  currentConfig = JSON.parse(JSON.stringify(p.config));
+  startTimer();
+}
+
+function deletePreset(userIdx) {
+  const presets = getUserPresets();
+  presets.splice(userIdx, 1);
+  saveUserPresets(presets);
+  renderPresets();
+}
+
+function esc(s) { const d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
+
+/* ================================================================
+   CONFIG
+   ================================================================ */
+let currentMode = 'hiit';
+let currentConfig = {};
+
+function openConfig(mode) {
+  currentMode = mode;
+  const body = document.getElementById('configBody');
+  const title = document.getElementById('configTitle');
+
+  switch(mode) {
+    case 'hiit':
+      title.textContent = 'HIIT';
+      currentConfig = { work: 30, rest: 15, rounds: 10 };
+      body.innerHTML = `
+        <div class="config-row"><label>Work (seconds)</label><input type="number" id="cfgWork" value="30" min="1" max="600"></div>
+        <div class="config-row"><label>Rest (seconds)</label><input type="number" id="cfgRest" value="15" min="0" max="600"></div>
+        <div class="config-row"><label>Rounds</label><input type="number" id="cfgRounds" value="10" min="1" max="100"></div>
+      `;
+      break;
+    case 'tabata':
+      title.textContent = 'Tabata';
+      currentConfig = { work: 20, rest: 10, rounds: 8 };
+      body.innerHTML = `
+        <div class="config-row"><label>Work (seconds)</label><input type="number" id="cfgWork" value="20" min="1" max="600"></div>
+        <div class="config-row"><label>Rest (seconds)</label><input type="number" id="cfgRest" value="10" min="0" max="600"></div>
+        <div class="config-row"><label>Rounds</label><input type="number" id="cfgRounds" value="8" min="1" max="100"></div>
+        <div style="font-size:0.75rem;color:var(--text-dim)">Classic Tabata: 20s work / 10s rest / 8 rounds. Adjust if desired.</div>
+      `;
+      break;
+    case 'emom':
+      title.textContent = 'EMOM';
+      currentConfig = { minutes: 10 };
+      body.innerHTML = `
+        <div class="config-row"><label>Minutes</label><input type="number" id="cfgMinutes" value="10" min="1" max="120"></div>
+      `;
+      break;
+    case 'custom':
+      title.textContent = 'Custom';
+      currentConfig = { segments: [{ name: 'Work', duration: 30, type: 'work' }, { name: 'Rest', duration: 15, type: 'rest' }] };
+      renderCustomConfig(body);
+      break;
+  }
+  showScreen('configScreen');
+}
+
+function renderCustomConfig(container) {
+  const segs = currentConfig.segments;
+  container.innerHTML = `
+    <div class="segment-list" id="segmentList">
+      ${segs.map((s, i) => `
+        <div class="segment-row">
+          <input type="text" value="${esc(s.name)}" placeholder="Name" onchange="currentConfig.segments[${i}].name=this.value">
+          <input type="number" value="${s.duration}" min="1" max="3600" onchange="currentConfig.segments[${i}].duration=+this.value">
+          <span style="font-size:0.75rem;color:var(--text-dim)">sec</span>
+          <select onchange="currentConfig.segments[${i}].type=this.value">
+            <option value="work" ${s.type==='work'?'selected':''}>Work</option>
+            <option value="rest" ${s.type==='rest'?'selected':''}>Rest</option>
+          </select>
+          <button class="small" onclick="removeSegment(${i})">&#10005;</button>
+        </div>
+      `).join('')}
+    </div>
+    <button class="small" onclick="addSegment()" style="align-self:flex-start">+ Add Segment</button>
+  `;
+}
+
+function addSegment() {
+  currentConfig.segments.push({ name: 'Work', duration: 30, type: 'work' });
+  renderCustomConfig(document.getElementById('configBody'));
+}
+
+function removeSegment(i) {
+  if (currentConfig.segments.length <= 1) return;
+  currentConfig.segments.splice(i, 1);
+  renderCustomConfig(document.getElementById('configBody'));
+}
+
+function readConfig() {
+  switch(currentMode) {
+    case 'hiit':
+    case 'tabata': {
+      const w = +(document.getElementById('cfgWork')?.value) || 30;
+      const r = +(document.getElementById('cfgRest')?.value) || 10;
+      const n = +(document.getElementById('cfgRounds')?.value) || 8;
+      currentConfig = { work: w, rest: r, rounds: n };
+      break;
+    }
+    case 'emom': {
+      const m = +(document.getElementById('cfgMinutes')?.value) || 10;
+      currentConfig = { minutes: m };
+      break;
+    }
+    // custom: already stored via onchange handlers
+  }
+}
+
+function saveAsPreset() {
+  readConfig();
+  const name = prompt('Preset name:');
+  if (!name) return;
+  const presets = getUserPresets();
+  presets.push({ name, mode: currentMode, config: JSON.parse(JSON.stringify(currentConfig)) });
+  saveUserPresets(presets);
+  renderPresets();
+}
+
+/* ================================================================
+   TIMER ENGINE
+   ================================================================ */
+let timerInterval = null;
+let paused = false;
+let segments = []; // [{label, duration, type:'work'|'rest', round, totalRounds}]
+let segIdx = 0;
+let segTimeLeft = 0;
+let totalDuration = 0;
+let elapsedTotal = 0;
+
+function buildSegments() {
+  segments = [];
+  switch(currentMode) {
+    case 'hiit':
+    case 'tabata':
+      for (let i = 0; i < currentConfig.rounds; i++) {
+        segments.push({ label: 'WORK', duration: currentConfig.work, type: 'work', round: i + 1, totalRounds: currentConfig.rounds });
+        if (currentConfig.rest > 0) {
+          segments.push({ label: 'REST', duration: currentConfig.rest, type: 'rest', round: i + 1, totalRounds: currentConfig.rounds });
+        }
+      }
+      break;
+    case 'emom':
+      for (let i = 0; i < currentConfig.minutes; i++) {
+        segments.push({ label: `MINUTE ${i + 1}`, duration: 60, type: 'work', round: i + 1, totalRounds: currentConfig.minutes });
+      }
+      break;
+    case 'custom':
+      currentConfig.segments.forEach((s, i) => {
+        segments.push({ label: s.name.toUpperCase() || `SEGMENT ${i+1}`, duration: s.duration, type: s.type, round: i + 1, totalRounds: currentConfig.segments.length });
+      });
+      break;
+  }
+  totalDuration = segments.reduce((a, s) => a + s.duration, 0);
+}
+
+function startTimer() {
+  readConfig();
+  buildSegments();
+  if (segments.length === 0) return;
+
+  segIdx = 0;
+  segTimeLeft = segments[0].duration;
+  elapsedTotal = 0;
+  paused = false;
+
+  showScreen('timerScreen');
+  document.getElementById('pauseBtn').textContent = 'Pause';
+  // Ensure audio context is started by user gesture
+  getAudioCtx();
+
+  // Countdown 3-2-1
+  let countdown = 3;
+  updateTimerUI('GET READY', '', formatTime(countdown), 'work', 0);
+  speak('Get ready');
+
+  const cdInterval = setInterval(() => {
+    countdown--;
+    if (countdown > 0) {
+      beepCountdown();
+      updateTimerUI('GET READY', '', formatTime(countdown), 'work', 0);
+    } else {
+      clearInterval(cdInterval);
+      beepTriple();
+      announceSegment(segments[0]);
+      renderSegment();
+      timerInterval = setInterval(tick, 1000);
+    }
+  }, 1000);
+
+  // Store the countdown interval so stop can clear it
+  timerInterval = cdInterval;
+}
+
+function tick() {
+  if (paused) return;
+  segTimeLeft--;
+  elapsedTotal++;
+
+  const seg = segments[segIdx];
+
+  // Countdown beeps for last 3 seconds
+  if (segTimeLeft <= 3 && segTimeLeft > 0) {
+    beepCountdown();
+  }
+
+  if (segTimeLeft <= 0) {
+    // Move to next segment
+    segIdx++;
+    if (segIdx >= segments.length) {
+      // Done!
+      clearInterval(timerInterval);
+      timerInterval = null;
+      beepTriple();
+      speak('Workout complete!');
+      updateTimerUI('DONE!', '', '0:00', 'done', 100);
+      return;
+    }
+    const next = segments[segIdx];
+    segTimeLeft = next.duration;
+    beepDouble();
+    announceSegment(next);
+  }
+
+  renderSegment();
+}
+
+function announceSegment(seg) {
+  if (seg.type === 'rest') {
+    speak('Rest');
+  } else if (seg.round === seg.totalRounds && currentMode !== 'custom') {
+    speak('Last round! Go!');
+  } else if (currentMode === 'emom') {
+    speak(`Minute ${seg.round}`);
+  } else if (currentMode === 'custom') {
+    speak(seg.label);
+  } else {
+    speak(`Round ${seg.round}. Go!`);
+  }
+}
+
+function renderSegment() {
+  const seg = segments[segIdx];
+  const pct = totalDuration > 0 ? ((elapsedTotal / totalDuration) * 100) : 0;
+  let colorClass = seg.type === 'rest' ? 'rest' : 'work';
+  if (segTimeLeft <= 3) colorClass = 'countdown';
+  const roundText = `Round ${seg.round} / ${seg.totalRounds}`;
+  updateTimerUI(seg.label, roundText, formatTime(segTimeLeft), colorClass, pct);
+}
+
+function updateTimerUI(phase, round, time, colorClass, progress) {
+  document.getElementById('timerPhase').textContent = phase;
+  document.getElementById('timerRound').textContent = round;
+  const display = document.getElementById('timerDisplay');
+  display.textContent = time;
+  display.className = 'timer-display color-' + colorClass;
+  document.getElementById('progressFill').style.width = Math.min(progress, 100) + '%';
+}
+
+function formatTime(secs) {
+  const m = Math.floor(secs / 60);
+  const s = secs % 60;
+  return m + ':' + String(s).padStart(2, '0');
+}
+
+function togglePause() {
+  paused = !paused;
+  document.getElementById('pauseBtn').textContent = paused ? 'Resume' : 'Pause';
+  if (!paused) beepLow();
+}
+
+function stopTimer() {
+  if (timerInterval) { clearInterval(timerInterval); timerInterval = null; }
+  paused = false;
+  showScreen('homeScreen');
+}
+
+/* ================================================================
+   REP COUNTER — DeviceMotion API
+   ================================================================ */
+let repCounting = false;
+let repCountVal = 0;
+let repMotionHandler = null;
+
+// State machine for rep detection
+let repState = 'idle'; // 'idle' | 'up' | 'down'
+let accelBuffer = [];
+const BUFFER_SIZE = 5;
+const THRESHOLD_UP = 12;
+const THRESHOLD_DOWN = 7;
+
+function openRepCounter() {
+  repCountVal = 0;
+  repCounting = false;
+  document.getElementById('repCount').textContent = '0';
+  document.getElementById('repToggleBtn').textContent = 'Start Counting';
+  showScreen('repScreen');
+}
+
+function toggleRepCounter() {
+  if (repCounting) {
+    stopRepCounter();
+  } else {
+    startRepCounter();
+  }
+}
+
+function startRepCounter() {
+  repCounting = true;
+  repState = 'idle';
+  accelBuffer = [];
+  document.getElementById('repToggleBtn').textContent = 'Stop Counting';
+
+  // Request permission on iOS
+  if (typeof DeviceMotionEvent !== 'undefined' && typeof DeviceMotionEvent.requestPermission === 'function') {
+    DeviceMotionEvent.requestPermission().then(response => {
+      if (response === 'granted') attachMotionListener();
+    }).catch(() => {});
+  } else {
+    attachMotionListener();
+  }
+}
+
+function attachMotionListener() {
+  repMotionHandler = function(e) {
+    if (!repCounting) return;
+    const acc = e.accelerationIncludingGravity;
+    if (!acc) return;
+    const mag = Math.sqrt(acc.x * acc.x + acc.y * acc.y + acc.z * acc.z);
+    accelBuffer.push(mag);
+    if (accelBuffer.length > BUFFER_SIZE) accelBuffer.shift();
+
+    const avg = accelBuffer.reduce((a, b) => a + b, 0) / accelBuffer.length;
+
+    if (repState === 'idle' || repState === 'down') {
+      if (avg > THRESHOLD_UP) {
+        repState = 'up';
+      }
+    } else if (repState === 'up') {
+      if (avg < THRESHOLD_DOWN) {
+        repState = 'down';
+        repCountVal++;
+        document.getElementById('repCount').textContent = repCountVal;
+        beep(600, 0.05, 0.3);
+      }
+    }
+  };
+  window.addEventListener('devicemotion', repMotionHandler);
+}
+
+function stopRepCounter() {
+  repCounting = false;
+  document.getElementById('repToggleBtn').textContent = 'Start Counting';
+  if (repMotionHandler) {
+    window.removeEventListener('devicemotion', repMotionHandler);
+    repMotionHandler = null;
+  }
+}
+
+function resetReps() {
+  repCountVal = 0;
+  document.getElementById('repCount').textContent = '0';
+  repState = 'idle';
+  accelBuffer = [];
+}
+
+/* ================================================================
+   INIT
+   ================================================================ */
+renderPresets();
+</script>
+</body>
+</html>

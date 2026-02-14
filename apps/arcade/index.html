@@ -1,0 +1,934 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>Retro Arcade Cabinet</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap');
+  *, *::before, *::after { margin:0; padding:0; box-sizing:border-box; }
+  :root { --green: #33ff33; --amber: #ffb000; --dim-green: #0a3a0a; --crt-bg: #0a0a0a; }
+  html, body { width:100%; height:100%; overflow:hidden; background:#000; font-family:'Press Start 2P', monospace; color:var(--green); touch-action:none; user-select:none; -webkit-user-select:none; }
+
+  /* CRT Scanline Overlay */
+  #crt-overlay {
+    position:fixed; top:0; left:0; width:100%; height:100%; pointer-events:none; z-index:100;
+    background: repeating-linear-gradient(0deg, rgba(0,0,0,0.15) 0px, rgba(0,0,0,0.15) 1px, transparent 1px, transparent 3px);
+    display:none;
+  }
+  #crt-overlay.active { display:block; }
+
+  /* Screens */
+  .screen { display:none; width:100%; height:100%; position:absolute; top:0; left:0; flex-direction:column; align-items:center; }
+  .screen.active { display:flex; }
+
+  /* Menu Screen */
+  #menu-screen { justify-content:flex-start; padding-top:clamp(1rem,4vh,2.5rem); overflow-y:auto; }
+  #menu-screen h1 { font-size:clamp(0.8rem,3vw,1.6rem); color:var(--amber); text-shadow:0 0 10px var(--amber), 0 0 30px rgba(255,176,0,0.4); margin-bottom:0.5rem; text-align:center; line-height:1.4; }
+  #menu-screen .subtitle { font-size:clamp(0.4rem,1.5vw,0.65rem); color:var(--green); opacity:0.6; margin-bottom:clamp(0.8rem,2vh,1.5rem); }
+
+  .game-list { list-style:none; width:90%; max-width:500px; }
+  .game-list li {
+    background:rgba(51,255,51,0.05); border:1px solid rgba(51,255,51,0.2); padding:clamp(0.6rem,1.5vh,1rem) clamp(0.8rem,2vw,1.2rem);
+    margin-bottom:0.6rem; cursor:pointer; transition:all 0.15s; border-radius:4px; display:flex; justify-content:space-between; align-items:center;
+  }
+  .game-list li:hover, .game-list li:active { background:rgba(51,255,51,0.15); border-color:var(--green); transform:scale(1.02); }
+  .game-list li .game-name { font-size:clamp(0.5rem,1.8vw,0.75rem); }
+  .game-list li .hi-score { font-size:clamp(0.35rem,1.2vw,0.5rem); color:var(--amber); }
+
+  .menu-controls { margin-top:clamp(0.6rem,2vh,1.2rem); display:flex; gap:0.8rem; flex-wrap:wrap; justify-content:center; }
+  .menu-btn {
+    font-family:inherit; font-size:clamp(0.35rem,1.2vw,0.5rem); padding:0.5rem 1rem; background:transparent;
+    border:1px solid var(--green); color:var(--green); cursor:pointer; border-radius:4px; transition:all 0.15s;
+  }
+  .menu-btn:hover { background:rgba(51,255,51,0.15); }
+  .menu-btn.active-toggle { background:rgba(51,255,51,0.2); color:var(--amber); border-color:var(--amber); }
+
+  /* Game Screen */
+  #game-screen { background:#000; }
+  #game-hud {
+    position:absolute; top:0; left:0; right:0; display:flex; justify-content:space-between; align-items:center;
+    padding:0.4rem 0.8rem; z-index:10; font-size:clamp(0.35rem,1.2vw,0.5rem);
+  }
+  #game-hud .hud-left, #game-hud .hud-right { display:flex; gap:1rem; align-items:center; }
+  #back-btn { font-family:inherit; font-size:clamp(0.35rem,1.2vw,0.5rem); background:transparent; border:1px solid rgba(51,255,51,0.4); color:var(--green); padding:0.25rem 0.6rem; cursor:pointer; border-radius:3px; }
+  #hud-score, #hud-hi { color:var(--amber); }
+  #hud-lives { color:var(--green); }
+
+  canvas#gameCanvas {
+    display:block; background:#000; image-rendering:pixelated;
+  }
+
+  /* Touch Controls */
+  #touch-controls {
+    position:fixed; bottom:0; left:0; right:0; display:none; justify-content:space-between; align-items:flex-end;
+    padding:0.8rem 1rem 1rem; z-index:50; pointer-events:none;
+  }
+  #touch-controls.visible { display:flex; }
+  .touch-zone { pointer-events:auto; }
+
+  /* D-Pad */
+  .dpad { display:grid; grid-template-columns:repeat(3,48px); grid-template-rows:repeat(3,48px); gap:2px; }
+  .dpad-btn {
+    width:48px; height:48px; background:rgba(51,255,51,0.15); border:1px solid rgba(51,255,51,0.3);
+    border-radius:6px; display:flex; align-items:center; justify-content:center; font-size:1.2rem; color:var(--green);
+    -webkit-tap-highlight-color:transparent;
+  }
+  .dpad-btn:active, .dpad-btn.pressed { background:rgba(51,255,51,0.4); }
+  .dpad-center { background:transparent; border:none; }
+
+  /* Action Buttons */
+  .action-btns { display:flex; gap:10px; align-items:flex-end; }
+  .action-btn {
+    width:56px; height:56px; border-radius:50%; background:rgba(255,176,0,0.15); border:2px solid rgba(255,176,0,0.4);
+    font-family:inherit; font-size:0.45rem; color:var(--amber); display:flex; align-items:center; justify-content:center;
+    -webkit-tap-highlight-color:transparent;
+  }
+  .action-btn:active, .action-btn.pressed { background:rgba(255,176,0,0.4); }
+  .action-btn.btn-b { width:48px; height:48px; margin-bottom:20px; }
+
+  /* Game Over overlay */
+  #game-over-overlay {
+    position:absolute; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.8);
+    display:none; flex-direction:column; align-items:center; justify-content:center; z-index:20;
+  }
+  #game-over-overlay.active { display:flex; }
+  #game-over-overlay h2 { font-size:clamp(0.8rem,3vw,1.4rem); color:var(--amber); margin-bottom:1rem; text-shadow:0 0 10px var(--amber); }
+  #game-over-overlay .final-score { font-size:clamp(0.5rem,2vw,0.8rem); color:var(--green); margin-bottom:0.5rem; }
+  #game-over-overlay .new-hi { font-size:clamp(0.4rem,1.5vw,0.6rem); color:var(--amber); margin-bottom:1.5rem; animation:blink 0.5s infinite; }
+  @keyframes blink { 50% { opacity:0; } }
+  #game-over-overlay .restart-hint { font-size:clamp(0.35rem,1.2vw,0.5rem); color:var(--green); opacity:0.7; }
+
+  /* Home link */
+  .home-link {
+    position:fixed; bottom:1.25rem; left:50%; transform:translateX(-50%); font-size:0.8rem;
+    color:rgba(255,255,255,0.35); text-decoration:none; z-index:10; font-family:inherit;
+  }
+  .home-link:hover { color:rgba(255,255,255,0.7); }
+
+  @media (pointer:fine) { #touch-controls { display:none !important; } }
+</style>
+</head>
+<body>
+
+<div id="crt-overlay"></div>
+
+<!-- MENU SCREEN -->
+<div id="menu-screen" class="screen active">
+  <h1>RETRO ARCADE<br>CABINET</h1>
+  <div class="subtitle">SELECT A GAME</div>
+  <ul class="game-list">
+    <li onclick="launchGame('asteroids')"><span class="game-name">1. ASTEROIDS</span><span class="hi-score" id="hi-asteroids">HI: 0</span></li>
+    <li onclick="launchGame('breakout')"><span class="game-name">2. BREAKOUT</span><span class="hi-score" id="hi-breakout">HI: 0</span></li>
+    <li onclick="launchGame('snake')"><span class="game-name">3. SNAKE</span><span class="hi-score" id="hi-snake">HI: 0</span></li>
+    <li onclick="launchGame('platformer')"><span class="game-name">4. PLATFORMER</span><span class="hi-score" id="hi-platformer">HI: 0</span></li>
+  </ul>
+  <div class="menu-controls">
+    <button class="menu-btn" id="crt-toggle" onclick="toggleCRT()">CRT: OFF</button>
+    <button class="menu-btn" id="clear-scores-btn" onclick="clearScores()">CLEAR SCORES</button>
+  </div>
+</div>
+
+<!-- GAME SCREEN -->
+<div id="game-screen" class="screen">
+  <div id="game-hud">
+    <div class="hud-left">
+      <button id="back-btn" onclick="returnToMenu()">ESC</button>
+      <span id="hud-lives"></span>
+    </div>
+    <div class="hud-right">
+      <span id="hud-score">0</span>
+      <span id="hud-hi">HI: 0</span>
+    </div>
+  </div>
+  <canvas id="gameCanvas"></canvas>
+  <div id="game-over-overlay">
+    <h2>GAME OVER</h2>
+    <div class="final-score" id="final-score"></div>
+    <div class="new-hi" id="new-hi-label" style="display:none">NEW HIGH SCORE!</div>
+    <div class="restart-hint">PRESS ENTER OR TAP TO RESTART</div>
+  </div>
+</div>
+
+<!-- TOUCH CONTROLS -->
+<div id="touch-controls">
+  <div class="touch-zone">
+    <div class="dpad">
+      <div></div>
+      <button class="dpad-btn" data-dir="up">&#9650;</button>
+      <div></div>
+      <button class="dpad-btn" data-dir="left">&#9664;</button>
+      <div class="dpad-center"></div>
+      <button class="dpad-btn" data-dir="right">&#9654;</button>
+      <div></div>
+      <button class="dpad-btn" data-dir="down">&#9660;</button>
+      <div></div>
+    </div>
+  </div>
+  <div class="touch-zone action-btns">
+    <button class="action-btn btn-b" data-action="b">B</button>
+    <button class="action-btn btn-a" data-action="a">A</button>
+  </div>
+</div>
+
+<a href="../" class="home-link">&larr; All Apps</a>
+
+<script>
+// ==================== CORE ENGINE ====================
+const canvas = document.getElementById('gameCanvas');
+const ctx = canvas.getContext('2d');
+let currentGame = null;
+let animFrame = null;
+let gameRunning = false;
+let gameOver = false;
+
+const keys = {};
+const touchState = { up:false, down:false, left:false, right:false, a:false, b:false };
+let gamepadState = { up:false, down:false, left:false, right:false, a:false, b:false };
+
+// High scores
+function getHi(name) { return parseInt(localStorage.getItem('arcade_hi_'+name)||'0'); }
+function setHi(name,v) { localStorage.setItem('arcade_hi_'+name, v); refreshMenuScores(); }
+function refreshMenuScores() {
+  ['asteroids','breakout','snake','platformer'].forEach(g => {
+    const el = document.getElementById('hi-'+g);
+    if(el) el.textContent = 'HI: '+getHi(g);
+  });
+}
+function clearScores() {
+  ['asteroids','breakout','snake','platformer'].forEach(g => localStorage.removeItem('arcade_hi_'+g));
+  refreshMenuScores();
+}
+refreshMenuScores();
+
+// CRT toggle
+let crtOn = false;
+function toggleCRT() {
+  crtOn = !crtOn;
+  document.getElementById('crt-overlay').classList.toggle('active', crtOn);
+  const btn = document.getElementById('crt-toggle');
+  btn.textContent = 'CRT: '+(crtOn?'ON':'OFF');
+  btn.classList.toggle('active-toggle', crtOn);
+}
+
+// Screen management
+function showScreen(id) {
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+}
+
+function resizeCanvas() {
+  const dpr = window.devicePixelRatio || 1;
+  const w = window.innerWidth;
+  const h = window.innerHeight;
+  canvas.style.width = w+'px';
+  canvas.style.height = h+'px';
+  canvas.width = w * dpr;
+  canvas.height = h * dpr;
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  canvas._w = w;
+  canvas._h = h;
+}
+window.addEventListener('resize', resizeCanvas);
+
+// Input
+document.addEventListener('keydown', e => {
+  keys[e.key] = true;
+  if(e.key === 'Escape') returnToMenu();
+  if(gameOver && e.key === 'Enter') restartCurrentGame();
+});
+document.addEventListener('keyup', e => { keys[e.key] = false; });
+
+function isDown(action) {
+  switch(action) {
+    case 'up': return keys['ArrowUp']||touchState.up||gamepadState.up;
+    case 'down': return keys['ArrowDown']||touchState.down||gamepadState.down;
+    case 'left': return keys['ArrowLeft']||touchState.left||gamepadState.left;
+    case 'right': return keys['ArrowRight']||touchState.right||gamepadState.right;
+    case 'a': return keys[' ']||keys['z']||touchState.a||gamepadState.a;
+    case 'b': return keys['x']||touchState.b||gamepadState.b;
+  }
+  return false;
+}
+
+// Touch controls
+const isTouchDevice = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
+function showTouch(show) {
+  document.getElementById('touch-controls').classList.toggle('visible', show && isTouchDevice);
+}
+
+document.querySelectorAll('.dpad-btn').forEach(btn => {
+  const dir = btn.dataset.dir;
+  const activate = () => { touchState[dir]=true; btn.classList.add('pressed'); };
+  const deactivate = () => { touchState[dir]=false; btn.classList.remove('pressed'); };
+  btn.addEventListener('touchstart', e => { e.preventDefault(); activate(); });
+  btn.addEventListener('touchend', e => { e.preventDefault(); deactivate(); });
+  btn.addEventListener('touchcancel', e => { deactivate(); });
+  btn.addEventListener('mousedown', e => { e.preventDefault(); activate(); });
+  btn.addEventListener('mouseup', e => { deactivate(); });
+  btn.addEventListener('mouseleave', e => { deactivate(); });
+});
+document.querySelectorAll('.action-btn').forEach(btn => {
+  const action = btn.dataset.action;
+  const activate = () => { touchState[action]=true; btn.classList.add('pressed'); };
+  const deactivate = () => { touchState[action]=false; btn.classList.remove('pressed'); };
+  btn.addEventListener('touchstart', e => { e.preventDefault(); activate(); });
+  btn.addEventListener('touchend', e => { e.preventDefault(); deactivate(); });
+  btn.addEventListener('touchcancel', e => { deactivate(); });
+  btn.addEventListener('mousedown', e => { e.preventDefault(); activate(); });
+  btn.addEventListener('mouseup', e => { deactivate(); });
+  btn.addEventListener('mouseleave', e => { deactivate(); });
+});
+
+// Gamepad polling
+function pollGamepad() {
+  const gp = navigator.getGamepads ? navigator.getGamepads()[0] : null;
+  if(!gp) { gamepadState={up:false,down:false,left:false,right:false,a:false,b:false}; return; }
+  const ax0 = gp.axes[0]||0, ax1 = gp.axes[1]||0;
+  gamepadState.left = ax0 < -0.5 || (gp.buttons[14] && gp.buttons[14].pressed);
+  gamepadState.right = ax0 > 0.5 || (gp.buttons[15] && gp.buttons[15].pressed);
+  gamepadState.up = ax1 < -0.5 || (gp.buttons[12] && gp.buttons[12].pressed);
+  gamepadState.down = ax1 > 0.5 || (gp.buttons[13] && gp.buttons[13].pressed);
+  gamepadState.a = (gp.buttons[0] && gp.buttons[0].pressed);
+  gamepadState.b = (gp.buttons[1] && gp.buttons[1].pressed);
+}
+
+// HUD
+function updateHUD(score, hi, lives) {
+  document.getElementById('hud-score').textContent = score;
+  document.getElementById('hud-hi').textContent = 'HI: '+hi;
+  document.getElementById('hud-lives').textContent = lives !== undefined ? 'x'+lives : '';
+}
+
+function showGameOver(score, gameName) {
+  gameOver = true;
+  gameRunning = false;
+  const overlay = document.getElementById('game-over-overlay');
+  document.getElementById('final-score').textContent = 'SCORE: '+score;
+  const isNew = score > getHi(gameName);
+  if(isNew) { setHi(gameName, score); }
+  document.getElementById('new-hi-label').style.display = isNew ? 'block' : 'none';
+  overlay.classList.add('active');
+}
+
+function hideGameOver() {
+  document.getElementById('game-over-overlay').classList.remove('active');
+  gameOver = false;
+}
+
+// Launch / Return
+function launchGame(name) {
+  currentGame = name;
+  showScreen('game-screen');
+  hideGameOver();
+  resizeCanvas();
+  showTouch(true);
+  gameRunning = true;
+  gameOver = false;
+  switch(name) {
+    case 'asteroids': initAsteroids(); break;
+    case 'breakout': initBreakout(); break;
+    case 'snake': initSnake(); break;
+    case 'platformer': initPlatformer(); break;
+  }
+}
+
+function returnToMenu() {
+  gameRunning = false;
+  gameOver = false;
+  if(animFrame) cancelAnimationFrame(animFrame);
+  showTouch(false);
+  hideGameOver();
+  refreshMenuScores();
+  showScreen('menu-screen');
+  currentGame = null;
+}
+
+function restartCurrentGame() {
+  if(currentGame) launchGame(currentGame);
+}
+
+// Game over overlay tap to restart
+document.getElementById('game-over-overlay').addEventListener('click', () => { if(gameOver) restartCurrentGame(); });
+document.getElementById('game-over-overlay').addEventListener('touchstart', e => { e.preventDefault(); if(gameOver) restartCurrentGame(); });
+
+// ==================== ASTEROIDS ====================
+function initAsteroids() {
+  if(animFrame) cancelAnimationFrame(animFrame);
+  const W = canvas._w, H = canvas._h;
+  let score = 0, lives = 3, level = 1;
+  const hi = getHi('asteroids');
+
+  const ship = { x:W/2, y:H/2, angle:0, vx:0, vy:0, thrust:false, radius:12 };
+  let bullets = [], asteroids = [], particles = [];
+  let invincible = 0, shootCooldown = 0;
+  let lastA = false;
+
+  function spawnAsteroids(n) {
+    for(let i=0;i<n;i++){
+      let x,y;
+      do { x=Math.random()*W; y=Math.random()*H; } while(Math.hypot(x-ship.x,y-ship.y)<120);
+      const a = Math.random()*Math.PI*2;
+      const sp = 0.5+Math.random()*1.5;
+      asteroids.push({x,y,vx:Math.cos(a)*sp,vy:Math.sin(a)*sp,radius:35+Math.random()*15,tier:3});
+    }
+  }
+  spawnAsteroids(3+level);
+
+  function splitAsteroid(ast) {
+    if(ast.tier <= 1) return;
+    for(let i=0;i<2;i++){
+      const a = Math.random()*Math.PI*2;
+      const sp = 1+Math.random()*2;
+      asteroids.push({x:ast.x,y:ast.y,vx:Math.cos(a)*sp,vy:Math.sin(a)*sp,radius:ast.radius*0.55,tier:ast.tier-1});
+    }
+  }
+
+  function addParticles(x,y,n,color) {
+    for(let i=0;i<n;i++){
+      const a=Math.random()*Math.PI*2, sp=1+Math.random()*3;
+      particles.push({x,y,vx:Math.cos(a)*sp,vy:Math.sin(a)*sp,life:20+Math.random()*20,color});
+    }
+  }
+
+  function wrap(obj) {
+    if(obj.x<-50) obj.x=W+50; if(obj.x>W+50) obj.x=-50;
+    if(obj.y<-50) obj.y=H+50; if(obj.y>H+50) obj.y=-50;
+  }
+
+  function tick(dt) {
+    pollGamepad();
+    // Ship rotation & thrust
+    if(isDown('left')) ship.angle -= 0.07;
+    if(isDown('right')) ship.angle += 0.07;
+    if(isDown('up')) {
+      ship.vx += Math.cos(ship.angle)*0.15;
+      ship.vy += Math.sin(ship.angle)*0.15;
+      ship.thrust = true;
+    } else ship.thrust = false;
+
+    // Shoot
+    const aDown = isDown('a');
+    if(aDown && !lastA && shootCooldown <= 0 && bullets.length < 8) {
+      bullets.push({x:ship.x+Math.cos(ship.angle)*14, y:ship.y+Math.sin(ship.angle)*14, vx:Math.cos(ship.angle)*7, vy:Math.sin(ship.angle)*7, life:50});
+      shootCooldown = 8;
+    }
+    lastA = aDown;
+    if(shootCooldown>0) shootCooldown--;
+
+    // Friction
+    ship.vx *= 0.99; ship.vy *= 0.99;
+    ship.x += ship.vx; ship.y += ship.vy;
+    wrap(ship);
+
+    // Bullets
+    bullets.forEach(b => { b.x+=b.vx; b.y+=b.vy; b.life--; wrap(b); });
+    bullets = bullets.filter(b => b.life > 0);
+
+    // Asteroids move
+    asteroids.forEach(a => { a.x+=a.vx; a.y+=a.vy; wrap(a); });
+
+    // Bullet-asteroid collision
+    for(let i=bullets.length-1;i>=0;i--){
+      for(let j=asteroids.length-1;j>=0;j--){
+        if(Math.hypot(bullets[i].x-asteroids[j].x, bullets[i].y-asteroids[j].y) < asteroids[j].radius){
+          addParticles(asteroids[j].x, asteroids[j].y, 8, '#33ff33');
+          splitAsteroid(asteroids[j]);
+          score += [0,100,50,20][asteroids[j].tier];
+          asteroids.splice(j,1);
+          bullets.splice(i,1);
+          break;
+        }
+      }
+    }
+
+    // Ship-asteroid collision
+    if(invincible <= 0) {
+      for(let j=asteroids.length-1;j>=0;j--){
+        if(Math.hypot(ship.x-asteroids[j].x, ship.y-asteroids[j].y) < asteroids[j].radius+ship.radius){
+          addParticles(ship.x, ship.y, 15, '#ffb000');
+          lives--;
+          invincible = 120;
+          ship.x=W/2; ship.y=H/2; ship.vx=0; ship.vy=0;
+          if(lives < 0) { showGameOver(score,'asteroids'); return; }
+          break;
+        }
+      }
+    } else invincible--;
+
+    // Particles
+    particles.forEach(p => { p.x+=p.vx; p.y+=p.vy; p.life--; });
+    particles = particles.filter(p => p.life > 0);
+
+    // Next level
+    if(asteroids.length === 0) { level++; spawnAsteroids(3+level); }
+
+    updateHUD(score, Math.max(score,hi), lives);
+  }
+
+  function draw() {
+    ctx.clearRect(0,0,W,H);
+
+    // Particles
+    particles.forEach(p => {
+      ctx.globalAlpha = p.life/40;
+      ctx.fillStyle = p.color;
+      ctx.fillRect(p.x-1,p.y-1,2,2);
+    });
+    ctx.globalAlpha = 1;
+
+    // Ship
+    if(invincible <= 0 || Math.floor(invincible/4)%2===0) {
+      ctx.save(); ctx.translate(ship.x, ship.y); ctx.rotate(ship.angle);
+      ctx.strokeStyle = '#33ff33'; ctx.lineWidth = 1.5;
+      ctx.beginPath(); ctx.moveTo(14,0); ctx.lineTo(-10,8); ctx.lineTo(-6,0); ctx.lineTo(-10,-8); ctx.closePath(); ctx.stroke();
+      if(ship.thrust) {
+        ctx.strokeStyle='#ffb000';
+        ctx.beginPath(); ctx.moveTo(-6,3); ctx.lineTo(-14-Math.random()*6,0); ctx.lineTo(-6,-3); ctx.stroke();
+      }
+      ctx.restore();
+    }
+
+    // Bullets
+    ctx.fillStyle = '#33ff33';
+    bullets.forEach(b => { ctx.fillRect(b.x-2,b.y-2,4,4); });
+
+    // Asteroids
+    asteroids.forEach(a => {
+      ctx.strokeStyle = '#33ff33'; ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      for(let i=0;i<8;i++){
+        const ang = (i/8)*Math.PI*2;
+        const r = a.radius*(0.8+0.2*Math.sin(i*3+a.radius));
+        const px = a.x+Math.cos(ang)*r, py = a.y+Math.sin(ang)*r;
+        i===0?ctx.moveTo(px,py):ctx.lineTo(px,py);
+      }
+      ctx.closePath(); ctx.stroke();
+    });
+  }
+
+  function loop() {
+    if(!gameRunning) return;
+    tick();
+    draw();
+    animFrame = requestAnimationFrame(loop);
+  }
+  updateHUD(score, hi, lives);
+  loop();
+}
+
+// ==================== BREAKOUT ====================
+function initBreakout() {
+  if(animFrame) cancelAnimationFrame(animFrame);
+  const W = canvas._w, H = canvas._h;
+  let score = 0, lives = 3;
+  const hi = getHi('breakout');
+
+  const cols = Math.max(6, Math.min(12, Math.floor(W/55)));
+  const rows = 6;
+  const brickW = (W-20)/cols - 4;
+  const brickH = Math.min(20, H*0.03);
+  const brickPad = 4;
+  const brickTop = 50;
+  const brickColors = ['#ff3333','#ff7733','#ffbb33','#33ff33','#3399ff','#9933ff'];
+
+  let bricks = [];
+  for(let r=0;r<rows;r++) for(let c=0;c<cols;c++){
+    bricks.push({ x:10+c*(brickW+brickPad)+brickPad/2, y:brickTop+r*(brickH+brickPad), w:brickW, h:brickH, color:brickColors[r], alive:true });
+  }
+
+  const padW = Math.min(100, W*0.2), padH = 12;
+  let padX = W/2-padW/2;
+  const padY = H - 60;
+
+  let ball = { x:W/2, y:padY-10, vx:3, vy:-3, r:5, launched:false };
+  let particles = [];
+
+  // Mouse/touch paddle control
+  let pointerX = W/2;
+  function onPointerMove(x) { pointerX = x; }
+  const moveHandler = e => { const t=e.touches?e.touches[0]:e; onPointerMove(t.clientX); };
+  canvas.addEventListener('mousemove', moveHandler);
+  canvas.addEventListener('touchmove', e => { e.preventDefault(); moveHandler(e); }, {passive:false});
+  canvas.addEventListener('touchstart', e => { e.preventDefault(); moveHandler(e); if(!ball.launched){ball.launched=true; ball.vy=-Math.abs(ball.vy);} }, {passive:false});
+  canvas.addEventListener('click', () => { if(!ball.launched) { ball.launched=true; ball.vy=-Math.abs(ball.vy); }});
+
+  function resetBall() {
+    ball.x=W/2; ball.y=padY-10; ball.vx=3*(Math.random()>0.5?1:-1); ball.vy=-3; ball.launched=false;
+  }
+
+  function addParticles(x,y,color) {
+    for(let i=0;i<6;i++){
+      const a=Math.random()*Math.PI*2, sp=1+Math.random()*2;
+      particles.push({x,y,vx:Math.cos(a)*sp,vy:Math.sin(a)*sp,life:15+Math.random()*10,color});
+    }
+  }
+
+  function tick() {
+    pollGamepad();
+    // Paddle
+    if(isDown('left')) pointerX -= 6;
+    if(isDown('right')) pointerX += 6;
+    if(isDown('a') && !ball.launched) { ball.launched=true; ball.vy=-Math.abs(ball.vy); }
+    padX = pointerX - padW/2;
+    padX = Math.max(0, Math.min(W-padW, padX));
+
+    if(!ball.launched) { ball.x=padX+padW/2; ball.y=padY-ball.r-1; return; }
+
+    ball.x += ball.vx; ball.y += ball.vy;
+
+    // Wall bounce
+    if(ball.x-ball.r<0){ ball.x=ball.r; ball.vx=Math.abs(ball.vx); }
+    if(ball.x+ball.r>W){ ball.x=W-ball.r; ball.vx=-Math.abs(ball.vx); }
+    if(ball.y-ball.r<0){ ball.y=ball.r; ball.vy=Math.abs(ball.vy); }
+
+    // Bottom
+    if(ball.y+ball.r > H) {
+      lives--;
+      if(lives<0) { showGameOver(score,'breakout'); return; }
+      resetBall();
+      return;
+    }
+
+    // Paddle bounce
+    if(ball.vy>0 && ball.y+ball.r>=padY && ball.y+ball.r<=padY+padH+4 && ball.x>=padX-4 && ball.x<=padX+padW+4){
+      ball.vy = -Math.abs(ball.vy);
+      const hit = (ball.x-(padX+padW/2))/(padW/2);
+      ball.vx = hit * 5;
+      ball.y = padY - ball.r - 1;
+      // Speed up slightly
+      const sp = Math.hypot(ball.vx, ball.vy);
+      const maxSp = 8;
+      if(sp < maxSp) { const f=Math.min(maxSp/sp,1.02); ball.vx*=f; ball.vy*=f; }
+    }
+
+    // Brick collision
+    for(let i=0;i<bricks.length;i++){
+      const b=bricks[i];
+      if(!b.alive) continue;
+      if(ball.x+ball.r>b.x && ball.x-ball.r<b.x+b.w && ball.y+ball.r>b.y && ball.y-ball.r<b.y+b.h){
+        b.alive=false;
+        score += 10;
+        addParticles(b.x+b.w/2, b.y+b.h/2, b.color);
+        // Determine bounce direction
+        const overlapX = Math.min(ball.x+ball.r-b.x, b.x+b.w-(ball.x-ball.r));
+        const overlapY = Math.min(ball.y+ball.r-b.y, b.y+b.h-(ball.y-ball.r));
+        if(overlapX < overlapY) ball.vx=-ball.vx; else ball.vy=-ball.vy;
+        break;
+      }
+    }
+
+    // Win check
+    if(bricks.every(b=>!b.alive)){
+      // Reset bricks with faster ball
+      bricks.forEach(b=>b.alive=true);
+      const sp = Math.hypot(ball.vx,ball.vy)*1.1;
+      resetBall();
+      ball.vx *= 1.1; ball.vy *= 1.1;
+    }
+
+    particles.forEach(p=>{p.x+=p.vx;p.y+=p.vy;p.life--;});
+    particles=particles.filter(p=>p.life>0);
+
+    updateHUD(score, Math.max(score,hi), lives);
+  }
+
+  function draw() {
+    ctx.clearRect(0,0,W,H);
+    // Bricks
+    bricks.forEach(b => {
+      if(!b.alive) return;
+      ctx.fillStyle = b.color;
+      ctx.fillRect(b.x, b.y, b.w, b.h);
+      ctx.strokeStyle = 'rgba(0,0,0,0.3)';
+      ctx.strokeRect(b.x, b.y, b.w, b.h);
+    });
+    // Paddle
+    ctx.fillStyle = '#33ff33';
+    ctx.fillRect(padX, padY, padW, padH);
+    // Ball
+    ctx.fillStyle = '#fff';
+    ctx.beginPath(); ctx.arc(ball.x, ball.y, ball.r, 0, Math.PI*2); ctx.fill();
+    // Particles
+    particles.forEach(p=>{
+      ctx.globalAlpha=p.life/25; ctx.fillStyle=p.color;
+      ctx.fillRect(p.x-1,p.y-1,3,3);
+    });
+    ctx.globalAlpha=1;
+  }
+
+  function loop() {
+    if(!gameRunning) {
+      canvas.removeEventListener('mousemove', moveHandler);
+      return;
+    }
+    tick(); draw();
+    animFrame = requestAnimationFrame(loop);
+  }
+  updateHUD(score, hi, lives);
+  loop();
+}
+
+// ==================== SNAKE ====================
+function initSnake() {
+  if(animFrame) cancelAnimationFrame(animFrame);
+  const W = canvas._w, H = canvas._h;
+  const gridSize = Math.max(12, Math.min(24, Math.floor(Math.min(W,H)/30)));
+  const cols = Math.floor(W/gridSize), rows = Math.floor(H/gridSize);
+  let score = 0;
+  const hi = getHi('snake');
+
+  let snake = [{x:Math.floor(cols/2), y:Math.floor(rows/2)}];
+  let dir = {x:1,y:0}, nextDir = {x:1,y:0};
+  let food = spawnFood();
+  let baseInterval = 120, interval = baseInterval;
+  let lastTick = 0;
+  let growing = 0;
+
+  // Swipe support
+  let swipeStart = null;
+  canvas.addEventListener('touchstart', e => { e.preventDefault(); const t=e.touches[0]; swipeStart={x:t.clientX,y:t.clientY}; }, {passive:false});
+  canvas.addEventListener('touchend', e => {
+    if(!swipeStart) return;
+    const t=e.changedTouches[0];
+    const dx=t.clientX-swipeStart.x, dy=t.clientY-swipeStart.y;
+    if(Math.abs(dx)+Math.abs(dy)<20) return;
+    if(Math.abs(dx)>Math.abs(dy)){
+      if(dx>0 && dir.x!== -1) nextDir={x:1,y:0};
+      else if(dx<0 && dir.x!== 1) nextDir={x:-1,y:0};
+    } else {
+      if(dy>0 && dir.y!== -1) nextDir={x:0,y:1};
+      else if(dy<0 && dir.y!== 1) nextDir={x:0,y:-1};
+    }
+    swipeStart=null;
+  });
+
+  function spawnFood() {
+    let fx, fy;
+    do { fx=Math.floor(Math.random()*cols); fy=Math.floor(Math.random()*rows); }
+    while(snake.some(s=>s.x===fx&&s.y===fy));
+    return {x:fx,y:fy};
+  }
+
+  let dirChanged = false;
+  function tick(ts) {
+    pollGamepad();
+    // D-pad input
+    if(!dirChanged){
+      if(isDown('up')&&dir.y!==1){ nextDir={x:0,y:-1}; dirChanged=true; }
+      else if(isDown('down')&&dir.y!==-1){ nextDir={x:0,y:1}; dirChanged=true; }
+      else if(isDown('left')&&dir.x!==1){ nextDir={x:-1,y:0}; dirChanged=true; }
+      else if(isDown('right')&&dir.x!==-1){ nextDir={x:1,y:0}; dirChanged=true; }
+    }
+
+    if(ts - lastTick < interval) return;
+    lastTick = ts;
+    dirChanged = false;
+    dir = {...nextDir};
+
+    const head = {x:snake[0].x+dir.x, y:snake[0].y+dir.y};
+
+    // Wrap
+    if(head.x<0) head.x=cols-1; if(head.x>=cols) head.x=0;
+    if(head.y<0) head.y=rows-1; if(head.y>=rows) head.y=0;
+
+    // Self collision
+    if(snake.some(s=>s.x===head.x&&s.y===head.y)){
+      showGameOver(score,'snake'); return;
+    }
+
+    snake.unshift(head);
+
+    if(head.x===food.x && head.y===food.y){
+      score += 10;
+      growing += 2;
+      food = spawnFood();
+      // Speed up
+      interval = Math.max(40, baseInterval - score*0.5);
+    }
+
+    if(growing > 0) growing--;
+    else snake.pop();
+
+    updateHUD(score, Math.max(score,hi));
+  }
+
+  function draw() {
+    ctx.clearRect(0,0,W,H);
+
+    // Grid (subtle)
+    ctx.strokeStyle = 'rgba(51,255,51,0.03)';
+    for(let x=0;x<=cols;x++){ ctx.beginPath(); ctx.moveTo(x*gridSize,0); ctx.lineTo(x*gridSize,rows*gridSize); ctx.stroke(); }
+    for(let y=0;y<=rows;y++){ ctx.beginPath(); ctx.moveTo(0,y*gridSize); ctx.lineTo(cols*gridSize,y*gridSize); ctx.stroke(); }
+
+    // Snake
+    snake.forEach((s,i)=>{
+      const alpha = 1 - (i/snake.length)*0.4;
+      ctx.fillStyle = i===0 ? '#33ff33' : `rgba(51,255,51,${alpha})`;
+      ctx.fillRect(s.x*gridSize+1, s.y*gridSize+1, gridSize-2, gridSize-2);
+    });
+
+    // Food
+    ctx.fillStyle = '#ff3333';
+    ctx.fillRect(food.x*gridSize+2, food.y*gridSize+2, gridSize-4, gridSize-4);
+  }
+
+  function loop(ts) {
+    if(!gameRunning) return;
+    tick(ts); draw();
+    animFrame = requestAnimationFrame(loop);
+  }
+  updateHUD(score, hi);
+  animFrame = requestAnimationFrame(loop);
+}
+
+// ==================== PLATFORMER ====================
+function initPlatformer() {
+  if(animFrame) cancelAnimationFrame(animFrame);
+  const W = canvas._w, H = canvas._h;
+  let score = 0;
+  const hi = getHi('platformer');
+
+  const GROUND = H - 80;
+  const GRAVITY = 0.6;
+  const JUMP_FORCE = -12;
+  const SPEED = 4;
+
+  let player = { x:80, y:GROUND, vy:0, w:20, h:24, grounded:false, jumping:false };
+  let platforms = [];
+  let cameraX = 0;
+  let distanceTraveled = 0;
+  let lastPlatEnd = 200;
+  let dead = false;
+
+  // Generate initial platforms
+  function generatePlatforms() {
+    while(lastPlatEnd < cameraX + W + 400){
+      const gap = 60 + Math.random()*80 + Math.min(distanceTraveled*0.01, 60);
+      const pw = 80 + Math.random()*150;
+      const py = GROUND - Math.random()*60;
+      // Sometimes make high platforms
+      const isHigh = Math.random() < 0.3;
+      const platY = isHigh ? GROUND - 40 - Math.random()*60 : GROUND;
+      platforms.push({ x:lastPlatEnd+gap, y:platY, w:pw, h:12 });
+      lastPlatEnd = lastPlatEnd+gap+pw;
+    }
+    // Remove old platforms
+    platforms = platforms.filter(p => p.x + p.w > cameraX - 100);
+  }
+
+  // Initial ground
+  platforms.push({x:-100, y:GROUND, w:400, h:12});
+  lastPlatEnd = 300;
+  generatePlatforms();
+
+  // Jump via touch/space/a
+  let jumpPressed = false;
+  canvas.addEventListener('touchstart', e => { e.preventDefault(); jumpPressed=true; }, {passive:false});
+  canvas.addEventListener('touchend', e => { e.preventDefault(); jumpPressed=false; });
+
+  function tick() {
+    pollGamepad();
+    const wantJump = isDown('a') || isDown('up') || keys[' '] || jumpPressed;
+
+    // Auto-run
+    player.x += SPEED;
+    distanceTraveled += SPEED;
+    score = Math.floor(distanceTraveled / 10);
+
+    // Jump
+    if(wantJump && player.grounded) {
+      player.vy = JUMP_FORCE;
+      player.grounded = false;
+      player.jumping = true;
+    }
+    // Variable jump height
+    if(!wantJump && player.vy < -4) {
+      player.vy = -4;
+    }
+
+    player.vy += GRAVITY;
+    player.y += player.vy;
+    player.grounded = false;
+
+    // Platform collision
+    for(const p of platforms){
+      if(player.x+player.w > p.x && player.x < p.x+p.w &&
+         player.y+player.h >= p.y && player.y+player.h <= p.y+p.h+player.vy+4 &&
+         player.vy >= 0){
+        player.y = p.y - player.h;
+        player.vy = 0;
+        player.grounded = true;
+        player.jumping = false;
+      }
+    }
+
+    // Fall death
+    if(player.y > H + 50){
+      showGameOver(score, 'platformer');
+      dead = true;
+      return;
+    }
+
+    cameraX = player.x - 80;
+    generatePlatforms();
+    updateHUD(score, Math.max(score,hi));
+  }
+
+  function draw() {
+    ctx.clearRect(0,0,W,H);
+    ctx.save();
+    ctx.translate(-cameraX, 0);
+
+    // Platforms
+    ctx.fillStyle = '#33ff33';
+    platforms.forEach(p => {
+      ctx.fillRect(p.x, p.y, p.w, p.h);
+      // Top line
+      ctx.fillStyle = '#44ff44';
+      ctx.fillRect(p.x, p.y, p.w, 2);
+      ctx.fillStyle = '#33ff33';
+    });
+
+    // Player
+    ctx.fillStyle = '#ffb000';
+    ctx.fillRect(player.x, player.y, player.w, player.h);
+    // Eyes
+    ctx.fillStyle = '#000';
+    ctx.fillRect(player.x+12, player.y+6, 4, 4);
+    ctx.fillRect(player.x+12, player.y+14, 4, 4);
+    // Jumping indicator
+    if(player.jumping) {
+      ctx.fillStyle='rgba(255,176,0,0.3)';
+      ctx.fillRect(player.x+4, player.y+player.h, 12, 4);
+    }
+
+    ctx.restore();
+
+    // Distance marker
+    ctx.fillStyle='rgba(51,255,51,0.3)';
+    ctx.font='10px monospace';
+    ctx.fillText(score+'m', W-60, 40);
+  }
+
+  function loop() {
+    if(!gameRunning || dead) return;
+    tick();
+    if(!dead) draw();
+    animFrame = requestAnimationFrame(loop);
+  }
+  updateHUD(score, hi);
+  loop();
+}
+
+// ==================== KEYBOARD MENU NAV ====================
+document.addEventListener('keydown', e => {
+  if(currentGame || !document.getElementById('menu-screen').classList.contains('active')) return;
+  const games = ['asteroids','breakout','snake','platformer'];
+  if(e.key >= '1' && e.key <= '4') {
+    launchGame(games[parseInt(e.key)-1]);
+  }
+});
+</script>
+</body>
+</html>
