@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
 <title>Decibel Meter + Exposure Tracker</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🔊</text></svg>">
+<link rel="stylesheet" href="../shared/menu.css">
 <style>
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -298,20 +299,6 @@
   }
   .clear-history:hover { border-color: var(--red); color: var(--red); }
 
-  /* Home link */
-  .home-link {
-    position: fixed;
-    bottom: 1.25rem;
-    left: 50%;
-    transform: translateX(-50%);
-    font-size: 0.8rem;
-    color: rgba(255,255,255,0.35);
-    text-decoration: none;
-    z-index: 10;
-    transition: color 0.2s;
-  }
-  .home-link:hover { color: rgba(255,255,255,0.7); }
-
   @media (min-width: 500px) {
     .db-value { font-size: 4.5rem; }
     .gauge-container { max-width: 440px; }
@@ -323,7 +310,6 @@
 
 <div class="header" style="display:flex;align-items:center;justify-content:space-between">
   <h1>Decibel Meter</h1>
-  <button class="app-menu-btn" onclick="document.getElementById('appMenu').classList.add('open')" aria-label="Menu">&#9776;</button>
 </div>
 
 <div class="start-section">
@@ -377,9 +363,6 @@
   <div class="section-title">Session History</div>
   <div id="historyList"></div>
 </div>
-
-<a href="../" class="home-link">&larr; All Apps</a>
-
 <script>
 (function() {
   // Elements
@@ -909,43 +892,8 @@
   });
 })();
 </script>
-<!-- App Menu -->
-<style>
-.app-menu-btn{background:none;border:none;color:inherit;opacity:0.35;font-size:1.2rem;width:2rem;height:2rem;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:opacity 0.15s;line-height:1;flex-shrink:0;padding:0}
-.app-menu-btn:hover{opacity:0.7}
-.app-header{display:flex;align-items:center;justify-content:space-between;padding:0.6rem 0.75rem;border-bottom:1px solid rgba(128,128,128,0.15)}
-.app-header h1{font-size:0.95rem;font-weight:700;letter-spacing:0.04em;text-transform:uppercase;margin:0;padding:0;text-align:left;border:none}
-.app-side-menu{position:fixed;inset:0;z-index:2000;pointer-events:none;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif}
-.app-side-menu.open{pointer-events:auto}
-.app-menu-overlay{position:absolute;inset:0;background:rgba(0,0,0,0.45);opacity:0;transition:opacity 0.25s}
-.app-side-menu.open .app-menu-overlay{opacity:1}
-.app-menu-panel{position:absolute;top:0;right:0;bottom:0;width:280px;max-width:85vw;background:#1a1a1a;color:#ccc;transform:translateX(100%);transition:transform 0.25s ease;display:flex;flex-direction:column;overflow-y:auto}
-.app-side-menu.open .app-menu-panel{transform:translateX(0)}
-.app-menu-head{display:flex;justify-content:space-between;align-items:center;padding:0.75rem 1rem;border-bottom:1px solid #2a2a2a}
-.app-menu-head h3{margin:0;font-size:0.7rem;text-transform:uppercase;letter-spacing:0.1em;color:#555}
-.app-menu-x{background:none;border:none;color:#555;font-size:1.1rem;cursor:pointer;padding:0.2rem;line-height:1}
-.app-menu-x:hover{color:#fff}
-.app-menu-nav{display:flex;flex-direction:column}
-.app-menu-nav a,.app-menu-nav button{display:block;width:100%;padding:0.65rem 1rem;color:#aaa;text-decoration:none;font-size:0.85rem;border:none;background:none;cursor:pointer;text-align:left;font-family:inherit;transition:background 0.15s}
-.app-menu-nav a:hover,.app-menu-nav button:hover{background:#222;color:#eee}
-.app-changelog{font-size:0.75rem;color:#777;line-height:1.5;max-height:0;overflow:hidden;transition:max-height 0.35s ease,padding 0.35s ease;padding:0 1rem;border-top:1px solid #2a2a2a}
-.app-changelog.show{max-height:80vh;padding:0.75rem 1rem;overflow-y:auto}
-.app-changelog h4{color:#999;font-size:0.65rem;text-transform:uppercase;letter-spacing:0.08em;margin:0.6rem 0 0.15rem;font-weight:600}
-.app-changelog h4:first-child{margin-top:0}
-.app-changelog .prompt{color:#666;border-left:2px solid #333;padding-left:0.5rem;margin:0.2rem 0;font-style:italic;font-size:0.72rem}
-.app-changelog ul{list-style:none;padding:0;margin:0.15rem 0}
-.app-changelog li{padding:0.1rem 0}
-.app-changelog li.done::before{content:"\2713  ";color:#4a4;font-weight:700}
-</style>
-<div id="appMenu" class="app-side-menu">
-<div class="app-menu-overlay" onclick="this.parentElement.classList.remove('open')"></div>
-<div class="app-menu-panel">
-<div class="app-menu-head"><h3>Menu</h3><button class="app-menu-x" onclick="document.getElementById('appMenu').classList.remove('open')">&times;</button></div>
-<nav class="app-menu-nav">
-<a href="../">&larr; All Apps</a>
-<button onclick="document.querySelector('.app-changelog').classList.toggle('show')">&#128203; Changelog</button>
-</nav>
-<div class="app-changelog">
+<script>
+window.APP_CHANGELOG = `
 <h4>Original Request</h4>
 <p class="prompt">&ldquo;Give me some ideas of useful or fun apps for men, simple apps for now.&rdquo;</p>
 <p>Among those 12, <strong>Decibel Meter</strong> was specified with:</p>
@@ -958,8 +906,8 @@
 <ul>
 <li class="done">Initial build &mdash; meter, spectrum, exposure tracking</li>
 </ul>
-</div>
-</div>
-</div>
+`;
+</script>
+<script src="../shared/menu.js"></script>
 </body>
 </html>
