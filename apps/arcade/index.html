@@ -522,12 +522,12 @@ function initBreakout() {
   const hi = getHi('breakout');
 
   const cols = Math.max(6, Math.min(12, Math.floor(W/55)));
-  const rows = 6;
+  const rows = 7;
   const brickW = (W-20)/cols - 4;
   const brickH = Math.min(20, H*0.03);
   const brickPad = 4;
   const brickTop = 50;
-  const brickColors = ['#ff3333','#ff7733','#ffbb33','#33ff33','#3399ff','#9933ff'];
+  const brickColors = ['#3C3B6E','#ffffff','#3C3B6E','#B22234','#ffffff','#B22234','#ffffff'];
 
   let bricks = [];
   for(let r=0;r<rows;r++) for(let c=0;c<cols;c++){
