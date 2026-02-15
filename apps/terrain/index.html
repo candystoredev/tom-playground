@@ -448,8 +448,8 @@ document.addEventListener('touchmove', e => {
       // Delta-based (like mouse): accumulate frame delta, reset each frame
       const ldx = t.clientX - touchState.look.lastX;
       const ldy = t.clientY - touchState.look.lastY;
-      touchLookDX += ldx * 0.004;
-      touchLookDY += ldy * 0.003;
+      touchLookDX += ldx * 0.0015;
+      touchLookDY += ldy * 0.001;
       touchState.look.lastX = t.clientX;
       touchState.look.lastY = t.clientY;
       // Visual feedback: nudge nub in swipe direction (clamped)
@@ -647,8 +647,8 @@ function update(dt) {
   mouseDX = 0; mouseDY = 0;
 
   // Touch — left joystick = move, right side = look
-  fwd -= touchMoveY * moveSpeed; // push up = forward
-  strafe += touchMoveX * moveSpeed;
+  fwd -= touchMoveY * moveSpeed * 0.5; // push up = forward
+  strafe += touchMoveX * moveSpeed * 0.5;
   camAngle += touchLookDX;
   camPitch += touchLookDY;
   touchLookDX = 0; touchLookDY = 0;
