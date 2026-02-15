@@ -23,6 +23,11 @@
     border-radius: 6px; max-width: 260px;
   }
   #controls-hint.faded { opacity: 0; }
+  .mobile-hint { display: none; }
+  @media (hover: none) and (pointer: coarse) {
+    .desktop-hint { display: none; }
+    .mobile-hint { display: inline; }
+  }
   #speed-display {
     position: absolute; top: 1rem; right: 1rem;
     color: rgba(255,255,255,0.5); font-size: 0.7rem;
@@ -48,9 +53,33 @@
     margin-bottom: 2px;
   }
   #pins-list div:hover { background: rgba(255,255,255,0.15); }
-  #touch-zone {
-    position: absolute; bottom: 0; left: 0; right: 0; height: 50%;
+  #touch-left, #touch-right {
+    position: absolute; bottom: 0; width: 50%; height: 55%;
     pointer-events: auto;
+  }
+  #touch-left { left: 0; }
+  #touch-right { right: 0; }
+  .joystick-ring {
+    position: absolute; bottom: 2.5rem; width: 100px; height: 100px;
+    border: 2px solid rgba(255,255,255,0.15); border-radius: 50%;
+    display: none;
+  }
+  #touch-left .joystick-ring { left: 1.2rem; }
+  #touch-right .joystick-ring { right: 1.2rem; }
+  .joystick-nub {
+    position: absolute; top: 50%; left: 50%;
+    width: 36px; height: 36px; margin: -18px 0 0 -18px;
+    background: rgba(255,255,255,0.2); border-radius: 50%;
+  }
+  .touch-label {
+    position: absolute; bottom: 0.6rem; font-size: 0.55rem;
+    color: rgba(255,255,255,0.3); text-transform: uppercase;
+    letter-spacing: 0.1em;
+  }
+  #touch-left .touch-label { left: 1.2rem; width: 100px; text-align: center; }
+  #touch-right .touch-label { right: 1.2rem; width: 100px; text-align: center; }
+  @media (hover: hover) and (pointer: fine) {
+    #touch-left, #touch-right { display: none; }
   }
   .home-link {
     position: fixed; bottom: 1.25rem; left: 50%; transform: translateX(-50%);
@@ -73,18 +102,21 @@
 <canvas id="cv"></canvas>
 <div id="hud">
   <div id="controls-hint">
-    WASD / Arrows — Move &amp; Turn<br>
+    <span class="desktop-hint">WASD / Arrows — Move &amp; Turn<br>
     Q/E — Strafe &nbsp; R/F — Up/Down<br>
-    Mouse drag — Look around<br>
-    +/- — Speed &nbsp; Touch — Move fwd<br>
-    Gamepad supported
+    Mouse drag — Look &nbsp; +/- — Speed<br>
+    Gamepad supported</span>
+    <span class="mobile-hint">Left thumb — Move<br>
+    Right thumb — Look around<br>
+    Auto-cruising... touch to take control</span>
   </div>
   <div id="daynight"></div>
   <div id="speed-display">Speed: 1.0x</div>
   <button id="pin-btn">📌 Drop Pin</button>
   <button id="sound-btn">🔊 Sound</button>
   <div id="pins-list"></div>
-  <div id="touch-zone"></div>
+  <div id="touch-left"><div class="joystick-ring"><div class="joystick-nub"></div></div><div class="touch-label">Move</div></div>
+  <div id="touch-right"><div class="joystick-ring"><div class="joystick-nub"></div></div><div class="touch-label">Look</div></div>
 </div>
 <script>
 // ========== SIMPLEX NOISE ==========
@@ -349,49 +381,99 @@ window.addEventListener('mousemove', e => {
   lastMX = e.clientX; lastMY = e.clientY;
 });
 
-// Touch
-let touchMoving = false;
-let touchLook = false;
-let touchStartX = 0, touchStartY = 0;
-let touchDX = 0, touchDY = 0;
+// Touch — dual joystick: left = move, right = look
+const touchState = { move: null, look: null }; // track by touch identifier
+let touchMoveX = 0, touchMoveY = 0; // -1..1 joystick axes
+let touchLookDX = 0, touchLookDY = 0; // delta per frame (zeroed each frame)
 
-const touchZone = document.getElementById('touch-zone');
+const touchLeftEl = document.getElementById('touch-left');
+const touchRightEl = document.getElementById('touch-right');
+const leftRing = touchLeftEl.querySelector('.joystick-ring');
+const rightRing = touchRightEl.querySelector('.joystick-ring');
+const leftNub = leftRing.querySelector('.joystick-nub');
+const rightNub = rightRing.querySelector('.joystick-nub');
+
+const JOY_RADIUS = 50; // half of 100px ring
+
+function isTouchDevice() {
+  return 'ontouchstart' in window || navigator.maxTouchPoints > 0;
+}
+
+if (isTouchDevice()) {
+  leftRing.style.display = 'block';
+  rightRing.style.display = 'block';
+}
+
+function classifyTouch(t) {
+  return t.clientX < window.innerWidth * 0.5 ? 'move' : 'look';
+}
+
+function getRingCenter(ring) {
+  const r = ring.getBoundingClientRect();
+  return { x: r.left + r.width / 2, y: r.top + r.height / 2 };
+}
+
+function updateNub(nub, dx, dy) {
+  nub.style.transform = `translate(${dx}px, ${dy}px)`;
+}
 
 document.addEventListener('touchstart', e => {
-  const t = e.touches[0];
-  if (t.clientY < window.innerHeight * 0.5) {
-    touchLook = true;
-  } else {
-    touchMoving = true;
+  for (const t of e.changedTouches) {
+    const side = classifyTouch(t);
+    if (side === 'move' && touchState.move === null) {
+      touchState.move = { id: t.identifier, startX: t.clientX, startY: t.clientY };
+    } else if (side === 'look' && touchState.look === null) {
+      touchState.look = { id: t.identifier, lastX: t.clientX, lastY: t.clientY };
+    }
   }
-  touchStartX = t.clientX;
-  touchStartY = t.clientY;
-  touchDX = 0; touchDY = 0;
 }, { passive: true });
 
 document.addEventListener('touchmove', e => {
-  const t = e.touches[0];
-  if (touchLook) {
-    touchDX = (t.clientX - touchStartX) * 0.004;
-    touchDY = (t.clientY - touchStartY) * 0.003;
+  for (const t of e.changedTouches) {
+    if (touchState.move && t.identifier === touchState.move.id) {
+      // Virtual joystick: offset from start, clamped to ring radius
+      let dx = t.clientX - touchState.move.startX;
+      let dy = t.clientY - touchState.move.startY;
+      const dist = Math.sqrt(dx * dx + dy * dy);
+      if (dist > JOY_RADIUS) { dx *= JOY_RADIUS / dist; dy *= JOY_RADIUS / dist; }
+      touchMoveX = dx / JOY_RADIUS; // -1..1
+      touchMoveY = dy / JOY_RADIUS;
+      updateNub(leftNub, dx, dy);
+    }
+    if (touchState.look && t.identifier === touchState.look.id) {
+      // Delta-based (like mouse): accumulate frame delta, reset each frame
+      const ldx = t.clientX - touchState.look.lastX;
+      const ldy = t.clientY - touchState.look.lastY;
+      touchLookDX += ldx * 0.004;
+      touchLookDY += ldy * 0.003;
+      touchState.look.lastX = t.clientX;
+      touchState.look.lastY = t.clientY;
+      // Visual feedback: nudge nub in swipe direction (clamped)
+      const mag = Math.sqrt(ldx * ldx + ldy * ldy);
+      const clamp = Math.min(1, mag / 30);
+      updateNub(rightNub, ldx * clamp, ldy * clamp);
+    }
   }
 }, { passive: true });
 
-document.addEventListener('touchend', () => {
-  touchMoving = false;
-  touchLook = false;
-  touchDX = 0; touchDY = 0;
-}, { passive: true });
+function releaseTouch(id) {
+  if (touchState.move && touchState.move.id === id) {
+    touchState.move = null;
+    touchMoveX = 0; touchMoveY = 0;
+    updateNub(leftNub, 0, 0);
+  }
+  if (touchState.look && touchState.look.id === id) {
+    touchState.look = null;
+    updateNub(rightNub, 0, 0);
+  }
+}
 
-// Gyroscope
-let gyroYaw = 0, gyroPitch = 0;
-let gyroEnabled = false;
-window.addEventListener('deviceorientation', e => {
-  if (e.gamma === null) return;
-  gyroEnabled = true;
-  gyroYaw = (e.gamma || 0) * 0.001;
-  gyroPitch = ((e.beta || 0) - 45) * 0.0005;
-});
+document.addEventListener('touchend', e => {
+  for (const t of e.changedTouches) releaseTouch(t.identifier);
+}, { passive: true });
+document.addEventListener('touchcancel', e => {
+  for (const t of e.changedTouches) releaseTouch(t.identifier);
+}, { passive: true });
 
 // Gamepad
 function readGamepad() {
@@ -517,9 +599,22 @@ document.getElementById('sound-btn').addEventListener('click', () => {
 
 // ========== MAIN LOOP ==========
 let lastTime = 0;
+let autoCruise = true; // gentle forward drift until user touches anything
+
+function cancelAutoCruise() {
+  if (!autoCruise) return;
+  autoCruise = false;
+}
+
+// Any deliberate input cancels auto-cruise
+window.addEventListener('keydown', cancelAutoCruise, { once: true });
+document.addEventListener('touchstart', cancelAutoCruise, { once: true });
+canvas.addEventListener('mousedown', cancelAutoCruise, { once: true });
 
 function update(dt) {
   const gp = readGamepad();
+  if (gp.lx || gp.ly || gp.rx || gp.ry) cancelAutoCruise();
+
   const moveSpeed = speed * speedMul * dt * 60;
   const turnSpeed = 0.04 * dt * 60;
 
@@ -547,18 +642,12 @@ function update(dt) {
   camPitch += mouseDY;
   mouseDX = 0; mouseDY = 0;
 
-  // Touch
-  if (touchMoving) fwd += moveSpeed;
-  if (touchLook) {
-    camAngle += touchDX * 0.3;
-    camPitch += touchDY * 0.3;
-  }
-
-  // Gyro
-  if (gyroEnabled) {
-    camAngle += gyroYaw;
-    camPitch += gyroPitch;
-  }
+  // Touch — left joystick = move, right side = look
+  fwd -= touchMoveY * moveSpeed; // push up = forward
+  strafe += touchMoveX * moveSpeed;
+  camAngle += touchLookDX;
+  camPitch += touchLookDY;
+  touchLookDX = 0; touchLookDY = 0;
 
   // Gamepad
   camAngle += gp.rx * turnSpeed * 2;
@@ -566,8 +655,14 @@ function update(dt) {
   fwd -= gp.ly * moveSpeed;
   strafe += gp.lx * moveSpeed;
 
+  // Auto-cruise: gentle forward drift + slow yaw
+  if (autoCruise) {
+    fwd += moveSpeed * 0.5;
+    camAngle += dt * 0.06;
+  }
+
   // Clamp pitch
-  camPitch = Math.max(-1.5, Math.min(1.5, camPitch));
+  camPitch = Math.max(-0.8, Math.min(0.8, camPitch));
 
   // Apply movement
   camX += Math.sin(camAngle) * fwd + Math.cos(camAngle) * strafe;
@@ -604,10 +699,10 @@ function frame(ts) {
 
 requestAnimationFrame(ts => { lastTime = ts; frame(ts); });
 
-// Fade controls hint after 5s
+// Fade controls hint (longer on touch devices so user can read)
 setTimeout(() => {
   document.getElementById('controls-hint').classList.add('faded');
-}, 5000);
+}, isTouchDevice() ? 10000 : 5000);
 </script>
 <script>
 window.APP_CHANGELOG = `
@@ -623,6 +718,7 @@ window.APP_CHANGELOG = `
 <ul>
 <li class="done" data-date="2026-02-14">Initial build &mdash; terrain generation + flythrough</li>
 <li class="done" data-date="2026-02-15">Fix broken simplex noise &mdash; Unicode minus signs replaced with ASCII</li>
+<li class="done" data-date="2026-02-15">Rewrite mobile controls &mdash; dual virtual joysticks (left=move, right=look), fix touch-look spinning bug, remove always-on gyroscope, add auto-cruise on load</li>
 </ul>
 `;
 </script>
