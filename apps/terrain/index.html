@@ -90,7 +90,7 @@
 // ========== SIMPLEX NOISE ==========
 const F2 = 0.5 * (Math.sqrt(3) - 1);
 const G2 = (3 - Math.sqrt(3)) / 6;
-const grad3 = [[1,1],[−1,1],[1,−1],[−1,−1],[1,0],[−1,0],[0,1],[0,−1]];
+const grad3 = [[1,1],[-1,1],[1,-1],[-1,-1],[1,0],[-1,0],[0,1],[0,-1]];
 const perm = new Uint8Array(512);
 const permMod8 = new Uint8Array(512);
 (function seedNoise() {
@@ -622,6 +622,7 @@ window.APP_CHANGELOG = `
 <h4>Changes</h4>
 <ul>
 <li class="done" data-date="2026-02-14">Initial build &mdash; terrain generation + flythrough</li>
+<li class="done" data-date="2026-02-15">Fix broken simplex noise &mdash; Unicode minus signs replaced with ASCII</li>
 </ul>
 `;
 </script>
