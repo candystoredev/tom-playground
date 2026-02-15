@@ -53,6 +53,10 @@
     margin-bottom: 2px;
   }
   #pins-list div:hover { background: rgba(255,255,255,0.15); }
+  @media (hover: none) and (pointer: coarse) {
+    #pin-btn, #pins-list { display: none; }
+    #sound-btn { bottom: auto; top: 3.2rem; left: 1rem; }
+  }
   #touch-left, #touch-right {
     position: absolute; bottom: 0; width: 50%; height: 55%;
     pointer-events: auto;
