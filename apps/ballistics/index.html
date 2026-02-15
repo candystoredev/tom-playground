@@ -38,24 +38,31 @@
   header {
     background: var(--bg2);
     border-bottom: 2px solid var(--amber-dim);
-    padding: 1rem 1.25rem 0;
+    padding: 0.6rem 1rem 0;
     position: sticky; top: 0; z-index: 20;
   }
   header h1 {
-    font-size: 1.15rem;
+    font-size: 1rem;
     color: var(--amber);
     font-weight: 700;
     letter-spacing: 0.04em;
-    margin-bottom: 0.75rem;
+    margin: 0;
+  }
+  /* Position the shared menu button inside the title row */
+  header > .app-menu-btn {
+    position: absolute;
+    top: 0.55rem;
+    right: 0.75rem;
   }
 
   .tabs {
     display: flex; gap: 0;
+    margin-top: 0.4rem;
   }
   .tab-btn {
     background: none; border: none; color: var(--text-dim);
-    padding: 0.5rem 1.25rem; cursor: pointer;
-    font-size: 0.85rem; font-weight: 600;
+    padding: 0.4rem 1rem; cursor: pointer;
+    font-size: 0.82rem; font-weight: 600;
     border-bottom: 2px solid transparent;
     transition: all 0.15s;
   }
@@ -245,10 +252,8 @@
 </head>
 <body>
 
-<header>
-  <div style="display:flex;align-items:center;justify-content:space-between">
-    <h1>Ballistics Calculator + Range Log</h1>
-</div>
+<header style="position:relative">
+  <h1>Ballistics Calculator + Range Log</h1>
   <div class="tabs">
     <button class="tab-btn active" data-tab="calc">Calculator</button>
     <button class="tab-btn" data-tab="log">Range Log</button>
