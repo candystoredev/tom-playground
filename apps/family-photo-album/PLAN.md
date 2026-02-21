@@ -1,6 +1,6 @@
 # Family Photo Album - Project Plan
 
-## Status: Planning Phase (Iterating — Review 3)
+## Status: Planning Phase (Iterating — Review 4)
 
 **Goal:** Replace the Tumblr-hosted family photo archive at thehoecks.com (~15 years, hundreds of posts, ~260 videos) with a custom self-hosted platform offering privacy controls, direct iPhone uploads, and family-specific features.
 
@@ -239,19 +239,41 @@ posts_fts (FTS5 virtual table — external content mode)
 
 ## 5. Build Phases
 
+### Testing approach
+Each phase ends with a **Verify** checklist — the phase isn't done until every item passes. Automated tests are reserved for logic that's tricky to validate visually (pagination cursors, slug dedup, auth middleware). Everything else is verified manually against the real deployment.
+
+**Automated tests** (written as they come up, not batched):
+- Slug generation (duplicates, untitled fallbacks, suffix logic)
+- Cursor-based pagination (ordering, tiebreakers, no skips/dupes)
+- Auth middleware (viewer can't reach admin, expired invite rejected, valid invite sets cookie)
+- FTS5 search (insert posts, verify results match)
+
+**Everything else**: manual verification against dev.thehoecks.com on both desktop and phone.
+
+---
+
 ### Phase 1 — Foundation & Schema
 - Initialize Next.js + Tailwind at `apps/thehoecks/`
 - Turso connection + **all schema setup** (all tables, FTS5, indexes, FTS sync triggers)
 - **Seed `site_settings`** with initial defaults: `viewer_password_hash` (set from env or prompted), `site_title` ("The Hoecks"), `site_description`, `imessage_recipients` (empty — admin fills in later)
-- Auth: session cookies + Bearer token validation
+- Auth (scoped for v1): shared password login page + session cookie middleware + admin bearer token validation. Invite link flow comes in Phase 5d.
 - All routes protected; admin routes gated separately
 - Dark theme skeleton layout (base colors, typography, spacing — applied from the start)
-- **`robots.txt`**: Block all crawlers from the entire site (individual post pages are publicly accessible by URL for OG previews, but should not be indexed)
+- **`robots.txt`**: Block all crawlers from the entire site
+- **Deploy to dev.thehoecks.com** — all subsequent phases are tested against real infrastructure, not just localhost
 
-### Phase 2 — Minimal Feed (Validation Surface)
-- Seed with 2-3 dummy posts (photo, video, text) using the R2 key convention (`media/{media_id}/original.{ext}`)
-- Basic chronological feed rendering using the dark theme
-- Purpose: validation surface for migration testing
+**Verify**: `npm run dev` starts without errors. Turso connects and tables exist. Login page renders. Logging in with the seeded password shows the skeleton layout. Logging out blocks access. Hitting an admin route without admin auth returns 403. Deploy to Vercel succeeds.
+
+### Phase 2 — First Vertical Slice
+- Upload 2-3 test media files to R2 manually (one photo, one video, one multi-photo set)
+- Seed corresponding posts in the DB with proper R2 key references
+- Render a basic chronological feed behind auth using the dark theme
+- Purpose: prove the full stack works end-to-end (Turso → API → R2 media → browser)
+- **Dummy data cleanup**: These seed posts are deleted before migration runs in Phase 3
+
+**Verify**: Log in → see posts with actual photos/videos loading from R2 → dark theme renders correctly. Check on phone too. Confirm media URLs resolve and thumbnails display.
+
+**Test**: Unit tests for slug generation (duplicate titles, untitled fallbacks, date-based slugs, suffix incrementing). This is the trickiest pure logic and benefits most from automated coverage.
 
 ### Phase 3 — Migration Script
 - Node.js local script (run once on your machine)
@@ -268,38 +290,108 @@ posts_fts (FTS5 virtual table — external content mode)
 - Output summary for validation (post count by type, media count, people imported, tags imported, skipped items with reasons)
 - **Post-migration backup**: Run `turso db dump` immediately after migration to snapshot the baseline
 
-### Phase 4 — Public Site (styled from the start)
-- Dark theme: same concept as current Tumblr site, refined to be sharper and more modern
-- Polished chronological feed with **cursor-based infinite scroll**
-  - **Home feed**: newest-first, cursor = `date` timestamp with `id` as tiebreaker for posts on the same date
-  - **Month/year pages**: oldest-first (Oct 1 → Oct 31), cursor walks forward through the range
-- **Multi-photo posts**: Grid/mosaic layout (Tumblr photoset style), using `photoset_layout` when available, auto-calculated layout otherwise
-- **Photo click**: Full-screen lightbox overlay (swipe/arrow between photos in a post, close to return to feed)
-- Year/month timeline navigation
-- Tag pages (`/tags/{slug}`), album pages (`/albums/{slug}`, with cover images), people pages (`/people/{slug}`)
-- Individual post page with slug-based URLs (`/posts/happy-steaksgiving-2025`)
-- Full-text search via FTS5
-- iMessage "text us about this" button on post pages
-- OpenGraph meta tags for iMessage preview cards
-- **Crawler blocking on post pages**: `<meta name="robots" content="noindex, nofollow">` on individual post pages + `X-Robots-Tag: noindex` response header. Combined with site-wide `robots.txt` from Phase 1, this prevents search engines from indexing family content while still allowing iMessage/social crawlers to fetch OG preview cards (they ignore robots.txt by design).
-- Lazy loading, responsive images served from R2 (pre-generated thumbnails, not Vercel image optimization)
-- Mobile-first responsive design
+**Staged testing** — run against real Tumblr API in three passes:
+1. **10 posts**: Verify data flow end-to-end — check DB records, R2 media, thumbnails, tags, people mapping. View in browser on dev.thehoecks.com.
+2. **100 posts**: Spot-check variety — multi-photo posts render grids, videos play, date parsing is correct, slug dedup works across real titles.
+3. **Full migration**: Run all posts. Compare output summary against expected totals. Browse feed to sanity check.
+
+**Verify**: Post count matches Tumblr. Media count matches (originals + thumbnails). No orphaned media (R2 keys without DB records) or orphaned records (DB entries without R2 media). People and tags correctly split. Feed renders all content on dev.thehoecks.com.
+
+### Phase 4 — Public Site
+
+Dark theme: same concept as current Tumblr site, refined to be sharper and more modern. Mobile-first responsive design throughout. Each sub-slice is deployed and verified before moving to the next.
+
+#### 4a. Feed + Infinite Scroll
+- Polished chronological feed with **cursor-based pagination** (date + id tiebreaker)
+- **Home feed**: newest-first
+- Lazy loading images using pre-generated thumbnails from R2
+
+**Verify**: Scroll loads next page seamlessly. No duplicated posts. No skipped posts. Works on phone.
+
+**Test**: Automated integration test for cursor pagination — seed 50+ posts (including same-timestamp posts), verify pages return correct order with no gaps or duplicates.
+
+#### 4b. Post Page + OG Tags + iMessage
+- Individual post page at `/posts/{slug}`
+- OpenGraph meta tags for iMessage preview cards (title, image, date, URL)
+- iMessage "text us about this" button (green, prominent)
+- Desktop fallback text for non-mobile browsers
+
+**Verify**: Paste a post URL in iMessage → preview card renders with photo and title. Tap iMessage button on phone → opens pre-filled text to correct recipients.
+
+**Test**: `curl` the post page → verify OG tags present in HTML response.
+
+#### 4c. Multi-Photo Grid + Lightbox
+- Grid/mosaic layout using `photoset_layout` when available, auto-calculated layout otherwise
+- Full-screen lightbox overlay on photo click
+- Swipe/arrow navigation between photos in a post
+- Close lightbox to return to feed
+
+**Verify**: On phone — tap photo, swipe through set, close lightbox. Grid layouts match Tumblr's layout for migrated multi-photo posts. Lightbox works with keyboard arrows on desktop.
+
+#### 4d. Tag, People, Album Pages
+- `/tags/{slug}`, `/people/{slug}`, `/albums/{slug}`
+- Filtered feeds with same cursor pagination as home feed
+- Album pages with cover images
+
+**Verify**: Click a tag → see only posts with that tag. People page shows correct people. Album cover displays. Pagination works within filtered views.
+
+#### 4e. Timeline + Month Pages
+- Year/month timeline navigation (sidebar or header)
+- **Month pages**: oldest-first (Oct 1 → Oct 31), cursor walks forward through the range
+
+**Verify**: Navigate to a specific month → posts in chronological (oldest-first) order. Pagination walks forward correctly. Timeline reflects actual months with content (no empty months shown).
+
+#### 4f. Search
+- FTS5 full-text search across titles, bodies, and tags
+- Search results page with highlighted matches
+
+**Verify**: Search "birthday" → finds birthday posts. Search a person's name → finds their posts. Empty search doesn't crash.
+
+**Test**: Automated FTS5 integration test — insert posts with known content, verify search returns correct results and ranking.
+
+#### 4g. Crawler Blocking + Privacy Hardening
+- `<meta name="robots" content="noindex, nofollow">` on individual post pages
+- `X-Robots-Tag: noindex` response header
+- Verify `robots.txt` from Phase 1 is working
+
+**Verify**: `curl -H "User-Agent: Googlebot" [post-url]` → response contains `noindex` meta tag and `X-Robots-Tag` header. OG tags still work (iMessage preview still renders — iMessage ignores robots directives by design).
 
 ### Phase 5 — Admin Panel & Settings
-- **Content management**:
-  - Presigned R2 upload flow (direct browser → R2, using key convention `media/{media_id}/original.{ext}`)
-  - **Thumbnail generation**: After original lands in R2, API fetches it back, generates thumbnail via `sharp`, uploads thumbnail to R2 as `media/{media_id}/thumb.{ext}`. Keeps all image processing server-side for consistent quality and future extensibility (multiple sizes, format conversion).
-  - Multi-file upload form: title, date override, tags, people, album
-  - Display order drag-to-reorder for multi-photo posts
-  - Video support with poster frame capture (client-side via `<video>` + canvas, uploaded as the thumbnail)
-  - Album cover selection (defaults to most recent, manually overridable)
-  - Edit and delete existing posts
-- **Settings page** (admin-only, stored in `site_settings` table):
-  - Change viewer shared password (hashed with bcrypt before storing)
-  - Generate, label, and revoke invite links
-  - Update iMessage recipient phone numbers
-  - Edit site title and description (used in OG tags)
-- Responsive web (not PWA)
+
+Each sub-slice builds on the previous. Responsive web throughout (not PWA).
+
+#### 5a. Single Photo Upload (the critical pipeline)
+- Presigned URL flow: browser → R2 (using key convention `media/{media_id}/original.{ext}`)
+- **Thumbnail generation**: API fetches original from R2 → `sharp` resizes → uploads thumbnail to R2 as `media/{media_id}/thumb.{ext}`
+- Post created in DB with both R2 keys
+- Photo appears in feed
+
+**Verify**: Upload a single photo → it appears in the feed with a proper thumbnail. Check R2 bucket — both `original.jpg` and `thumb.jpg` exist at correct paths. This proves the entire upload pipeline end-to-end.
+
+#### 5b. Full Upload Form
+- Multi-file upload with title, date override, tags, people, album assignment
+- Display order drag-to-reorder for multi-photo posts
+- Video support with client-side poster frame capture (`<video>` + canvas → uploaded as thumbnail)
+- Album cover selection (defaults to most recent, manually overridable)
+
+**Verify**: Upload a 4-photo post with tags and people → renders in feed with correct grid layout, tags link to tag pages, people link to people pages. Upload a video → poster frame thumbnail displays in feed, video plays on post page. Drag-reorder changes display order.
+
+#### 5c. Edit + Delete
+- Edit post metadata: title, date, tags, people, album
+- Add/remove media from existing posts
+- Delete posts (with R2 cleanup — remove media files)
+
+**Verify**: Edit a post's title → change appears in feed and post page. Add a photo to an existing post → grid updates. Delete a post → gone from feed, media removed from R2 (check bucket).
+
+#### 5d. Settings Page
+- Change viewer shared password (bcrypt hashed before storing)
+- Generate, label, and revoke invite links
+- Update iMessage recipient phone numbers
+- Edit site title and description (used in OG tags)
+
+**Verify**: Change password → old password fails login, new password works. Create a labeled invite link → open in incognito → auto-authorized without password. Revoke the link → same URL now rejected. Update iMessage numbers → post page button uses new numbers.
+
+**Test**: Automated auth middleware tests — viewer JWT can't access admin routes, expired/revoked invite tokens are rejected, valid invite token sets session cookie correctly.
 
 ### Phase 6 — iOS Shortcut
 - Shortcut definition + setup guide
@@ -309,15 +401,22 @@ posts_fts (FTS5 virtual table — external content mode)
 - EXIF date extraction → pre-fills post date
 - For video: iOS Shortcut can resize a frame as a thumbnail, or server handles it
 
+**Verify**: On iPhone — select 3 photos → share → shortcut → fill in title and tags → post appears on dev.thehoecks.com with correct thumbnails, tags, and EXIF-derived date.
+
 ### Phase 7 — Performance & Polish
 - Performance optimization with real content (no visual redesign — styling was applied in Phase 4)
 - Loading states and perceived performance improvements
-- Final cross-browser and mobile testing
-- Accessibility pass
+- Final cross-browser and mobile testing (Safari, Chrome, Firefox — desktop and phone)
+- Accessibility pass (keyboard navigation, screen reader basics, color contrast)
+
+**Verify**: Lighthouse score for performance. Feed loads quickly on throttled mobile connection. All interactive elements keyboard-accessible. No layout shifts on scroll.
 
 ### Phase 8 — Go Live
+- Final review of all content on dev.thehoecks.com
 - DNS update: thehoecks.com → Vercel production
 - Merge to master → auto-deploy
+- Verify production site works end-to-end (login → feed → post → iMessage → search)
+- Share invite links with family
 
 ---
 
