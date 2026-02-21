@@ -445,7 +445,49 @@ NEXT_PUBLIC_SITE_URL       = https://dev.thehoecks.com
 
 ---
 
-## 13. Open Questions / Items to Revisit
+## 13. V2 Features (Post-Launch)
+
+Things that are good ideas but not needed to ship v1. Schema can accommodate these later without breaking changes.
+
+### Category Management
+- **Tags**: Display name (e.g., "perform" → "Performances"), description, custom sort order
+- **People**: Display name, profile photo (`profile_photo_r2_key`), description, custom sort order
+- **Albums**: Already have title/description/cover — add custom sort order
+
+### Admin Enhancements
+- Change admin password from settings (v1: env var only)
+- Default tags/people quick-pick lists for upload form
+- Posts-per-page tuning knob
+- Site banner image upload (changeable without redeploy)
+- Bulk operations (multi-select posts for tag/album assignment)
+
+### Content Features
+- "On this day" — surface posts from the same date in past years
+- Favorites / pinned posts
+- Download original photo button (for family members)
+- Print-friendly view for individual posts or albums
+
+### Search & Discovery
+- Search by date range
+- Filter by multiple tags/people simultaneously
+- "Related posts" suggestions (same tags/people/date)
+
+### Media
+- Video thumbnail selection from frame picker (v1: auto poster frame)
+- Multiple thumbnail sizes (feed vs. lightbox vs. OG)
+- HEIC → JPEG conversion on upload for broader compatibility
+
+### Analytics (lightweight)
+- Most-viewed posts (simple counter, no third-party tracking)
+- Invite link usage stats (which links are active)
+
+### Infrastructure
+- Automated backup schedule (cron → `turso db dump` → R2)
+- Staging environment for testing changes
+
+---
+
+## 14. Open Questions / Items to Revisit
 
 1. ~~Who uploads?~~ → Tom primarily, via admin panel + iOS Shortcut
 2. ~~Privacy level?~~ → Invite links (auto-authorize) + shared password fallback
