@@ -64,9 +64,11 @@ A Tumblr-hosted family photo blog running since ~2012, using a custom dark theme
 | Feed pagination | Cursor-based infinite scroll | Home: newest-first; month pages: oldest-first |
 | Auth (browser) | Session JWT / cookie-based | Simple family access |
 | Auth (API) | Bearer token (ADMIN_API_TOKEN) | iOS Shortcut requirement |
-| User accounts | Single shared password | "One password, everyone's in" — no individual accounts |
+| Viewer access | Invite links + shared password fallback | Invite links auto-authorize; password for direct visits |
+| Admin settings | Settings page in admin panel | Change password, manage invites, update iMessage numbers — no redeploy needed |
 | Comments | None — iMessage instead | Privacy, no moderation, natural conversation |
-| Feedback | iMessage pre-fill button | Zero infrastructure, "text us about this" |
+| Feedback | iMessage pre-fill to both Tom + wife | Group message via `sms:` URI with multiple recipients |
+| Tumblr redirects | None — let old URLs 404 | Clean break, no redirect maintenance |
 | Admin UX | Responsive web (NOT PWA) | PWA on iOS is unreliable |
 | Upload flow | Presigned R2 URLs | Bypass Vercel 4.5MB body limit, direct to R2 |
 | Video | Direct R2 serve, no transcoding | No cost/latency for encoding |
@@ -101,11 +103,13 @@ A Tumblr-hosted family photo blog running since ~2012, using a custom dark theme
 - **Turso** (SQLite) with FTS5 full-text search
 - Free Starter plan
 
-### Authentication
-- **Browser**: Session cookies (JWT-based)
-- **API/iOS**: Bearer token (`ADMIN_API_TOKEN`)
-- All routes protected by default
-- Single shared family password for viewer access
+### Authentication & Access Control
+- **Viewer access (two paths)**:
+  1. **Invite link**: `thehoecks.com/invite/[token]` — clicking auto-sets a session cookie, no password needed. Admin can label, expire, or revoke links.
+  2. **Shared password**: For anyone visiting the site directly without an invite link. Admin-changeable from the settings page (no redeploy).
+- **Admin access**: Separate admin password (or same JWT with an admin flag). Gates the admin panel + settings.
+- **API/iOS**: Bearer token (`ADMIN_API_TOKEN`) for iOS Shortcut uploads
+- All browsing/listing routes protected by default. Individual post pages publicly accessible by URL (for iMessage OG previews) but not discoverable.
 
 ---
 
@@ -163,6 +167,19 @@ post_albums (junction)
 ├── post_id (FK → posts)
 ├── album_id (FK → albums)
 
+invite_links
+├── id (PK, nanoid)
+├── token (string, unique — random, used in URL)
+├── label (string, optional — e.g., "Grandma's link", "Uncle Joe")
+├── created_at (datetime)
+├── expires_at (datetime, nullable — null = never expires)
+├── revoked (boolean, default false)
+
+site_settings (key-value store)
+├── key (PK, string — e.g., "viewer_password", "imessage_recipients", "site_title")
+├── value (text)
+├── updated_at (datetime)
+
 posts_fts (FTS5 virtual table)
 ├── rowid → posts.id
 ├── title (indexed)
@@ -176,6 +193,8 @@ posts_fts (FTS5 virtual table)
 - **Thumbnails**: `thumbnail_r2_key` stores pre-generated optimized versions (photos) and poster frames (videos). Generated via `sharp` at upload time, not on-the-fly — avoids Vercel's 1,000/month image optimization cap on free tier.
 - **Post type `text`**: Covers imported Tumblr text, quote, link, and answer post types (all fundamentally text with optional metadata). Audio posts skipped unless present.
 - **Album covers**: `cover_media_id` points to an existing media item. Default: most recent photo in the album. Admin UI allows override.
+- **Invite links**: Each link contains a random token (`/invite/[token]`). Clicking it sets a session cookie — viewer is authorized. Admin can label links (to track who has which), set expiry, or revoke. Optional label helps answer "who did I give access to?"
+- **Site settings**: Simple key-value table for admin-configurable values. Avoids redeploying to Vercel just to change a phone number or password. Keys include: `viewer_password`, `imessage_recipients`, `site_title`, `site_description`.
 - Month/year tags (e.g., "aug2013") are NOT imported as tags — they become the post `date` field
 - All thematic tags (school, perform, travel, etc.) migrate as-is
 - FTS5 virtual table created at schema init
@@ -224,14 +243,20 @@ posts_fts (FTS5 virtual table)
 - Lazy loading, responsive images served from R2 (pre-generated thumbnails, not Vercel image optimization)
 - Mobile-first responsive design
 
-### Phase 5 — Admin Panel
-- Presigned R2 upload flow (direct browser → R2)
-- Thumbnail generation via `sharp` on upload (stored in R2 alongside original)
-- Multi-file upload form: title, date override, tags, people, album
-- Display order drag-to-reorder for multi-photo posts
-- Video support with poster frame selection (stored as `thumbnail_r2_key`)
-- Album cover selection (defaults to most recent, manually overridable)
-- Edit and delete existing posts
+### Phase 5 — Admin Panel & Settings
+- **Content management**:
+  - Presigned R2 upload flow (direct browser → R2)
+  - Thumbnail generation via `sharp` on upload (stored in R2 alongside original)
+  - Multi-file upload form: title, date override, tags, people, album
+  - Display order drag-to-reorder for multi-photo posts
+  - Video support with poster frame selection (stored as `thumbnail_r2_key`)
+  - Album cover selection (defaults to most recent, manually overridable)
+  - Edit and delete existing posts
+- **Settings page** (admin-only, stored in `site_settings` table):
+  - Change viewer shared password
+  - Generate, label, and revoke invite links
+  - Update iMessage recipient phone numbers
+  - Edit site title and description (used in OG tags)
 - Responsive web (not PWA)
 
 ### Phase 6 — iOS Shortcut
@@ -290,6 +315,11 @@ posts_fts (FTS5 virtual table)
 - Color: Green (iMessage system color)
 - Placement: Below photo(s) on post page, large and obvious
 
+### Recipients
+- Group message to both Tom and wife via `sms:` URI with multiple recipients
+- Format: `sms:+1XXXXXXXXXX,+1YYYYYYYYYY&body=...`
+- Phone numbers stored in `site_settings` table (key: `imessage_recipients`) — admin can update without redeploying
+
 ### Pre-filled Message
 ```
 https://thehoecks.com/posts/[post-slug]
@@ -311,7 +341,7 @@ My reaction:
 Post pages must be publicly accessible by URL (for iMessage crawler to generate preview cards), but not indexed/discoverable. All listing/browsing pages remain behind auth. Non-sequential nanoid-based slugs prevent enumeration of the archive.
 
 ### Desktop Fallback
-"To share your thoughts, text us at [number] and mention the photo title"
+"To share your thoughts, text us at [number(s)] and mention the photo title"
 
 ---
 
@@ -332,6 +362,7 @@ Post pages must be publicly accessible by URL (for iMessage crawler to generate 
 ## 9. Environment Variables (Vercel Dashboard)
 
 ```
+# Infrastructure (Vercel env vars — rarely change)
 TURSO_DATABASE_URL        = libsql://thehoecks-[username].turso.io
 TURSO_AUTH_TOKEN           = [from Turso CLI]
 
@@ -343,8 +374,15 @@ R2_PUBLIC_URL              = https://pub-[hash].r2.dev
 
 JWT_SECRET                 = [random 32+ char string]
 ADMIN_API_TOKEN            = [random 32+ char string]
+ADMIN_PASSWORD             = [random string — for admin panel access]
 
 NEXT_PUBLIC_SITE_URL       = https://dev.thehoecks.com
+
+# Operational settings (stored in DB site_settings table — admin-changeable)
+# viewer_password          → shared family password
+# imessage_recipients      → comma-separated phone numbers
+# site_title               → "The Hoecks"
+# site_description         → for OG meta tags
 ```
 
 ---
@@ -410,7 +448,7 @@ NEXT_PUBLIC_SITE_URL       = https://dev.thehoecks.com
 ## 13. Open Questions / Items to Revisit
 
 1. ~~Who uploads?~~ → Tom primarily, via admin panel + iOS Shortcut
-2. ~~Privacy level?~~ → Protected. Single shared family password for viewers.
+2. ~~Privacy level?~~ → Invite links (auto-authorize) + shared password fallback
 3. ~~Domain?~~ → thehoecks.com (same domain)
 4. ~~Budget?~~ → ~$0-2/month
 5. ~~Tech stack?~~ → Next.js + Vercel + R2 + Turso (decided)
@@ -418,8 +456,9 @@ NEXT_PUBLIC_SITE_URL       = https://dev.thehoecks.com
 7. ~~Image optimization?~~ → Pre-generated via sharp, stored in R2 (not Vercel)
 8. ~~Feed pagination?~~ → Cursor-based infinite scroll; newest-first on home, oldest-first on month pages
 9. ~~Non-photo Tumblr posts?~~ → Import as `text` type; skip audio unless present
-10. iMessage recipient: single phone number or shared address? (TBD)
-11. Tumblr blog handle: exact identifier needed for API (e.g., thehoecks.tumblr.com)
-12. Should existing Tumblr URLs redirect to new site?
-13. Invite system details: link format, expiry?
+10. ~~iMessage recipients?~~ → Group message to both Tom + wife; numbers stored in DB, admin-changeable
+11. Tumblr blog handle: exact identifier needed for API (e.g., thehoecks.tumblr.com) — **Tom will provide later**
+12. ~~Tumblr URL redirects?~~ → No redirects, let old URLs 404. Clean break.
+13. ~~Invite system?~~ → Token-based links (`/invite/[token]`), admin can label/expire/revoke, plus shared password fallback
 14. ~~Design?~~ → Same dark theme concept but refined/sharper; grid/mosaic for multi-photo; full-screen lightbox on click
+15. ~~Admin console?~~ → Yes — settings page in admin panel for password, invites, iMessage numbers, site metadata
