@@ -70,6 +70,9 @@ A Tumblr-hosted family photo blog running since ~2012, using a custom dark theme
 | Admin UX | Responsive web (NOT PWA) | PWA on iOS is unreliable |
 | Upload flow | Presigned R2 URLs | Bypass Vercel 4.5MB body limit, direct to R2 |
 | Video | Direct R2 serve, no transcoding | No cost/latency for encoding |
+| Dark theme | Same concept as Tumblr, refined/sharper | Keep the feel, modernize the execution |
+| Multi-photo layout | Grid/mosaic (Tumblr photoset style) | Natural for multi-photo posts |
+| Photo click | Full-screen lightbox | Immersive viewing without leaving the page |
 | Migration source | Tumblr API | Official, complete, preserves metadata |
 | Search | FTS5 (SQLite) | Free, included, performant |
 | EXIF (migration) | Use Tumblr timestamps | Tumblr strips EXIF from uploads |
@@ -83,7 +86,9 @@ A Tumblr-hosted family photo blog running since ~2012, using a custom dark theme
 ### Frontend & Hosting
 - **Next.js** (App Router) on **Vercel** free tier
 - **Tailwind CSS** for styling
-- Dark theme matching current aesthetic
+- Dark theme — same concept as current Tumblr site but refined: sharper, more modern, cleaner
+- **Photo interaction**: Full-screen lightbox on click (no page navigation needed to view photos)
+- **Multi-photo posts**: Grid/mosaic layout (similar to Tumblr photosets)
 
 ### Media Storage & Optimization
 - **Cloudflare R2** bucket: `thehoecks-media`
@@ -204,10 +209,12 @@ posts_fts (FTS5 virtual table)
 - **Post-migration backup**: Run `turso db dump` immediately after migration to snapshot the baseline
 
 ### Phase 4 — Public Site (styled from the start)
-- Dark theme applied as pages are built (not deferred to a later phase)
+- Dark theme: same concept as current Tumblr site, refined to be sharper and more modern
 - Polished chronological feed with **cursor-based infinite scroll**
   - **Home feed**: newest-first, cursor = `posted_at` timestamp
   - **Month/year pages**: oldest-first (Oct 1 → Oct 31), cursor walks forward through the range
+- **Multi-photo posts**: Grid/mosaic layout (Tumblr photoset style)
+- **Photo click**: Full-screen lightbox overlay (swipe/arrow between photos in a post, close to return to feed)
 - Year/month timeline navigation
 - Tag pages, album pages (with cover images), people pages
 - Individual post page with slug-based URLs (`/posts/happy-steaksgiving-2025`)
@@ -415,7 +422,4 @@ NEXT_PUBLIC_SITE_URL       = https://dev.thehoecks.com
 11. Tumblr blog handle: exact identifier needed for API (e.g., thehoecks.tumblr.com)
 12. Should existing Tumblr URLs redirect to new site?
 13. Invite system details: link format, expiry?
-14. **Design — pending Tom's input:**
-    - Dark theme: keep current Tumblr look, or refreshed/different direction?
-    - Multi-photo layout: grid/mosaic, vertical stack, or carousel?
-    - Photo click behavior: lightbox, navigate to post page, or both?
+14. ~~Design?~~ → Same dark theme concept but refined/sharper; grid/mosaic for multi-photo; full-screen lightbox on click
