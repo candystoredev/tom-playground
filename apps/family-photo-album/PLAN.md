@@ -1,6 +1,6 @@
 # Family Photo Album - Project Plan
 
-## Status: Planning Phase (Iterating — Review 2)
+## Status: Planning Phase (Iterating — Review 3)
 
 **Goal:** Replace the Tumblr-hosted family photo archive at thehoecks.com (~15 years, hundreds of posts, ~260 videos) with a custom self-hosted platform offering privacy controls, direct iPhone uploads, and family-specific features.
 
@@ -80,6 +80,11 @@ A Tumblr-hosted family photo blog running since ~2012, using a custom dark theme
 | EXIF (migration) | Use Tumblr timestamps | Tumblr strips EXIF from uploads |
 | EXIF (new posts) | iOS extracts, pre-fills date | Native, automatic |
 | Project location | `apps/thehoecks/` | Alongside other apps in monorepo |
+| Thumbnail generation | Server-side `sharp` after R2 upload | Future-proof — supports multiple sizes, format conversion, smart cropping later |
+| R2 key convention | `media/{media_id}/original.{ext}` | Clean per-asset directories, extensible for future variants |
+| People migration | Pre-defined people list in migration config | Deterministic — Tom provides names, script maps matching tags |
+| Crawler blocking | `robots.txt` + `noindex` meta tags | Enforces privacy for post pages that must be publicly accessible for OG previews |
+| Password storage | Hashed (bcrypt) in `site_settings` | Never store plaintext passwords |
 
 ---
 
@@ -99,6 +104,28 @@ A Tumblr-hosted family photo blog running since ~2012, using a custom dark theme
 - Presigned upload URLs for both admin panel and iOS Shortcut
 - **Image optimization**: Pre-generate thumbnails/web-optimized versions via `sharp` at upload time, stored alongside originals in R2. Serves pre-built versions directly — does NOT rely on Vercel/Next.js Image optimization (free tier caps at 1,000 optimizations/month, far too low for a photo site)
 
+#### R2 Key Convention
+All media organized by media ID with separate files per variant:
+```
+media/{media_id}/original.{ext}     — full-size original
+media/{media_id}/thumb.{ext}        — optimized thumbnail for feed
+```
+This structure supports future variants (multiple sizes, AVIF, etc.) by adding files to the same directory without schema changes.
+
+#### Thumbnail Generation Flow
+**Migration** (Phase 3): `sharp` runs locally on your machine — downloads Tumblr media, generates thumbnails, uploads both to R2. No server constraints.
+
+**Admin panel & iOS Shortcut uploads** (Phases 5-6):
+1. Client requests presigned upload URL(s) from API
+2. Client uploads original directly to R2 via presigned URL (bypasses Vercel 4.5MB body limit)
+3. Client calls `POST /api/posts` with metadata + R2 keys
+4. API route fetches the original from R2, generates thumbnail via `sharp`, uploads thumbnail to R2
+5. API saves post record with both R2 keys
+
+Step 4 works because: R2 → Vercel fetch is fast (Cloudflare network), `sharp` resizes a typical iPhone photo (3-8MB) in under a second, and uploading a ~100KB thumbnail back to R2 is near-instant. Total well within Vercel's 10-second function timeout. For unusually large files, the API can stream the download rather than buffering the full file.
+
+**Video poster frames**: For migration, use `ffmpeg` locally to extract the first frame. For admin uploads, capture a frame client-side via `<video>` element + canvas API — the browser already has the file loaded. This avoids needing ffmpeg on the server. v2 adds a frame picker for choosing a specific frame.
+
 ### Database
 - **Turso** (SQLite) with FTS5 full-text search
 - Free Starter plan
@@ -106,10 +133,10 @@ A Tumblr-hosted family photo blog running since ~2012, using a custom dark theme
 ### Authentication & Access Control
 - **Viewer access (two paths)**:
   1. **Invite link**: `thehoecks.com/invite/[token]` — clicking auto-sets a session cookie, no password needed. Admin can label, expire, or revoke links.
-  2. **Shared password**: For anyone visiting the site directly without an invite link. Admin-changeable from the settings page (no redeploy).
+  2. **Shared password**: For anyone visiting the site directly without an invite link. Admin-changeable from the settings page (no redeploy). **Stored hashed** (bcrypt) in `site_settings` — never plaintext.
 - **Admin access**: Separate admin password (or same JWT with an admin flag). Gates the admin panel + settings.
 - **API/iOS**: Bearer token (`ADMIN_API_TOKEN`) for iOS Shortcut uploads
-- All browsing/listing routes protected by default. Individual post pages publicly accessible by URL (for iMessage OG previews) but not discoverable.
+- All browsing/listing routes protected by default. Individual post pages publicly accessible by URL (for iMessage OG previews) but not discoverable — blocked by `robots.txt` and `noindex` meta tags (see Privacy section).
 
 ---
 
@@ -123,6 +150,7 @@ posts
 ├── body (text, optional — sanitized HTML)
 ├── date (datetime — from EXIF, Tumblr metadata, or manual override)
 ├── type (enum: photo | video | mixed | text)
+├── photoset_layout (string, optional — e.g., "212" = 2-1-2 grid rows, from Tumblr photosets)
 ├── created_at (datetime)
 ├── updated_at (datetime)
 
@@ -134,6 +162,7 @@ media
 ├── type (enum: photo | video)
 ├── width (integer)
 ├── height (integer)
+├── file_size (integer, bytes — for storage tracking and upload validation)
 ├── duration (integer, seconds, video only)
 ├── display_order (integer, multi-photo ordering)
 ├── mime_type (string)
@@ -141,6 +170,7 @@ media
 tags
 ├── id (PK, nanoid)
 ├── name (string, unique)
+├── slug (string, unique — URL-friendly, auto-generated from name)
 ├── created_at (datetime)
 
 post_tags (junction)
@@ -150,6 +180,7 @@ post_tags (junction)
 people
 ├── id (PK, nanoid)
 ├── name (string)
+├── slug (string, unique — URL-friendly, auto-generated from name)
 ├── created_at (datetime)
 
 post_people (junction)
@@ -159,6 +190,7 @@ post_people (junction)
 albums
 ├── id (PK, nanoid)
 ├── title (string)
+├── slug (string, unique — URL-friendly, auto-generated from title)
 ├── description (string, optional)
 ├── cover_media_id (FK → media, nullable — defaults to most recent photo in album)
 ├── created_at (datetime)
@@ -176,28 +208,32 @@ invite_links
 ├── revoked (boolean, default false)
 
 site_settings (key-value store)
-├── key (PK, string — e.g., "viewer_password", "imessage_recipients", "site_title")
+├── key (PK, string — e.g., "viewer_password_hash", "imessage_recipients", "site_title")
 ├── value (text)
 ├── updated_at (datetime)
 
-posts_fts (FTS5 virtual table)
-├── rowid → posts.id
+posts_fts (FTS5 virtual table — external content mode)
+├── Backed by posts table via SQLite's implicit integer rowid
 ├── title (indexed)
 ├── body (indexed)
-├── tags (indexed)
+├── tags (indexed — denormalized comma-separated tag names for search)
 ```
 
 **Key design notes:**
 - **IDs**: All primary keys use nanoid (non-sequential random strings). Since post pages are publicly accessible for iMessage OG previews, sequential IDs would make the entire archive guessable/scrapeable.
-- **Slugs**: Posts have URL-friendly slugs (`/posts/happy-steaksgiving-2025`) auto-generated from title. Slug is used in URLs; nanoid is the internal PK for foreign keys. Duplicate titles get a suffix (`-2`, `-3`).
-- **Thumbnails**: `thumbnail_r2_key` stores pre-generated optimized versions (photos) and poster frames (videos). Generated via `sharp` at upload time, not on-the-fly — avoids Vercel's 1,000/month image optimization cap on free tier.
+- **Slugs**: Posts, tags, people, and albums all have URL-friendly slugs auto-generated from their name/title. Posts use slugs in URLs (`/posts/happy-steaksgiving-2025`); nanoid is the internal PK for foreign keys. Duplicate titles get a suffix (`-2`, `-3`). This same suffix strategy applies to date-based fallback slugs for untitled posts (e.g., `2023-10-15`, `2023-10-15-2`).
+- **Thumbnails**: `thumbnail_r2_key` stores pre-generated optimized versions (photos) and poster frames (videos). Generated via `sharp` server-side after upload — avoids Vercel's 1,000/month image optimization cap on free tier.
+- **File size**: `file_size` on media tracks bytes for storage monitoring in admin and upload validation. Easy to populate at upload time, annoying to backfill later.
+- **Photoset layout**: `photoset_layout` preserves Tumblr's grid layout string (e.g., `"212"` = 2 photos row 1, 1 photo row 2, 2 photos row 3). Imported during migration; new posts can set it or let the frontend auto-calculate a layout from photo count and aspect ratios.
 - **Post type `text`**: Covers imported Tumblr text, quote, link, and answer post types (all fundamentally text with optional metadata). Audio posts skipped unless present.
 - **Album covers**: `cover_media_id` points to an existing media item. Default: most recent photo in the album. Admin UI allows override.
 - **Invite links**: Each link contains a random token (`/invite/[token]`). Clicking it sets a session cookie — viewer is authorized. Admin can label links (to track who has which), set expiry, or revoke. Optional label helps answer "who did I give access to?"
-- **Site settings**: Simple key-value table for admin-configurable values. Avoids redeploying to Vercel just to change a phone number or password. Keys include: `viewer_password`, `imessage_recipients`, `site_title`, `site_description`.
+- **Site settings**: Simple key-value table for admin-configurable values. Avoids redeploying to Vercel just to change a phone number or password. Keys include: `viewer_password_hash` (bcrypt hash, never plaintext), `imessage_recipients`, `site_title`, `site_description`.
+- **FTS5 implementation**: Uses external content mode (`content=posts, content_rowid=rowid`) backed by SQLite's implicit integer rowid — not the nanoid text PK. Requires triggers on `posts` INSERT/UPDATE/DELETE to keep the FTS index in sync. Tags are denormalized into the FTS table as a comma-separated string for search. This is the standard SQLite approach for FTS5 with non-integer PKs.
+- **Password hashing**: `viewer_password_hash` stores a bcrypt hash. The app hashes on password set/change and compares hashes on login. Plaintext passwords never touch the database.
 - Month/year tags (e.g., "aug2013") are NOT imported as tags — they become the post `date` field
 - All thematic tags (school, perform, travel, etc.) migrate as-is
-- FTS5 virtual table created at schema init
+- FTS5 virtual table + sync triggers created at schema init
 
 ---
 
@@ -205,13 +241,15 @@ posts_fts (FTS5 virtual table)
 
 ### Phase 1 — Foundation & Schema
 - Initialize Next.js + Tailwind at `apps/thehoecks/`
-- Turso connection + **all schema setup** (all tables, FTS5, indexes)
+- Turso connection + **all schema setup** (all tables, FTS5, indexes, FTS sync triggers)
+- **Seed `site_settings`** with initial defaults: `viewer_password_hash` (set from env or prompted), `site_title` ("The Hoecks"), `site_description`, `imessage_recipients` (empty — admin fills in later)
 - Auth: session cookies + Bearer token validation
 - All routes protected; admin routes gated separately
 - Dark theme skeleton layout (base colors, typography, spacing — applied from the start)
+- **`robots.txt`**: Block all crawlers from the entire site (individual post pages are publicly accessible by URL for OG previews, but should not be indexed)
 
 ### Phase 2 — Minimal Feed (Validation Surface)
-- Seed with 2-3 dummy posts (photo, video, text)
+- Seed with 2-3 dummy posts (photo, video, text) using the R2 key convention (`media/{media_id}/original.{ext}`)
 - Basic chronological feed rendering using the dark theme
 - Purpose: validation surface for migration testing
 
@@ -220,40 +258,44 @@ posts_fts (FTS5 virtual table)
 - Tumblr API v2 pagination with rate-limit handling
 - Handles all Tumblr post types: photo/video → `photo`/`video`/`mixed`; text/quote/link/answer → `text` type
 - **HTML sanitization**: Strip unsafe markup from Tumblr captions/bodies on import (DOMPurify or similar)
-- All media downloaded and uploaded to R2, with thumbnails pre-generated via `sharp` during migration
+- All media downloaded and uploaded to R2 using key convention (`media/{media_id}/original.{ext}`, `media/{media_id}/thumb.{ext}`), with thumbnails pre-generated via `sharp` during migration. Video poster frames extracted via `ffmpeg` locally.
+- **People mapping**: Migration config file contains a pre-defined list of people names (Tom provides). Script matches Tumblr tags against this list — matches go to `people` table + `post_people`, everything else goes to `tags` table + `post_tags`.
 - Post dates from Tumblr metadata (not EXIF — Tumblr strips it)
 - Month/year tags → post `date` field; thematic tags preserved
-- Auto-generate slug from post title (or date-based fallback for untitled posts)
-- Output summary for validation (post count by type, media count, skipped items with reasons)
+- Auto-generate slug from post title (or date-based fallback for untitled posts). Duplicate slugs — whether from duplicate titles or multiple untitled posts on the same date — get suffixed (`-2`, `-3`, etc.)
+- Preserve Tumblr `photoset_layout` strings for multi-photo posts
+- Record `file_size` for each media item during download
+- Output summary for validation (post count by type, media count, people imported, tags imported, skipped items with reasons)
 - **Post-migration backup**: Run `turso db dump` immediately after migration to snapshot the baseline
 
 ### Phase 4 — Public Site (styled from the start)
 - Dark theme: same concept as current Tumblr site, refined to be sharper and more modern
 - Polished chronological feed with **cursor-based infinite scroll**
-  - **Home feed**: newest-first, cursor = `posted_at` timestamp
+  - **Home feed**: newest-first, cursor = `date` timestamp with `id` as tiebreaker for posts on the same date
   - **Month/year pages**: oldest-first (Oct 1 → Oct 31), cursor walks forward through the range
-- **Multi-photo posts**: Grid/mosaic layout (Tumblr photoset style)
+- **Multi-photo posts**: Grid/mosaic layout (Tumblr photoset style), using `photoset_layout` when available, auto-calculated layout otherwise
 - **Photo click**: Full-screen lightbox overlay (swipe/arrow between photos in a post, close to return to feed)
 - Year/month timeline navigation
-- Tag pages, album pages (with cover images), people pages
+- Tag pages (`/tags/{slug}`), album pages (`/albums/{slug}`, with cover images), people pages (`/people/{slug}`)
 - Individual post page with slug-based URLs (`/posts/happy-steaksgiving-2025`)
 - Full-text search via FTS5
 - iMessage "text us about this" button on post pages
 - OpenGraph meta tags for iMessage preview cards
+- **Crawler blocking on post pages**: `<meta name="robots" content="noindex, nofollow">` on individual post pages + `X-Robots-Tag: noindex` response header. Combined with site-wide `robots.txt` from Phase 1, this prevents search engines from indexing family content while still allowing iMessage/social crawlers to fetch OG preview cards (they ignore robots.txt by design).
 - Lazy loading, responsive images served from R2 (pre-generated thumbnails, not Vercel image optimization)
 - Mobile-first responsive design
 
 ### Phase 5 — Admin Panel & Settings
 - **Content management**:
-  - Presigned R2 upload flow (direct browser → R2)
-  - Thumbnail generation via `sharp` on upload (stored in R2 alongside original)
+  - Presigned R2 upload flow (direct browser → R2, using key convention `media/{media_id}/original.{ext}`)
+  - **Thumbnail generation**: After original lands in R2, API fetches it back, generates thumbnail via `sharp`, uploads thumbnail to R2 as `media/{media_id}/thumb.{ext}`. Keeps all image processing server-side for consistent quality and future extensibility (multiple sizes, format conversion).
   - Multi-file upload form: title, date override, tags, people, album
   - Display order drag-to-reorder for multi-photo posts
-  - Video support with poster frame selection (stored as `thumbnail_r2_key`)
+  - Video support with poster frame capture (client-side via `<video>` + canvas, uploaded as the thumbnail)
   - Album cover selection (defaults to most recent, manually overridable)
   - Edit and delete existing posts
 - **Settings page** (admin-only, stored in `site_settings` table):
-  - Change viewer shared password
+  - Change viewer shared password (hashed with bcrypt before storing)
   - Generate, label, and revoke invite links
   - Update iMessage recipient phone numbers
   - Edit site title and description (used in OG tags)
@@ -262,9 +304,10 @@ posts_fts (FTS5 virtual table)
 ### Phase 6 — iOS Shortcut
 - Shortcut definition + setup guide
 - Uses ADMIN_API_TOKEN (stored in iOS Keychain)
-- Flow: Select photos → Share → "Post to Family Album" → fill title/tags → uploads directly to R2 → creates post via API
+- Flow: Select photos → Share → "Post to Family Album" → fill title/tags → uploads directly to R2 via presigned URL → calls `POST /api/posts` → server generates thumbnail via `sharp` (same flow as admin panel)
 - Supports: single photo, multi-photo, video, mixed
 - EXIF date extraction → pre-fills post date
+- For video: iOS Shortcut can resize a frame as a thumbnail, or server handles it
 
 ### Phase 7 — Performance & Polish
 - Performance optimization with real content (no visual redesign — styling was applied in Phase 4)
@@ -285,19 +328,28 @@ posts_fts (FTS5 virtual table)
 - OAuth credentials required: Consumer Key + Consumer Secret
 - Paginate through all posts with rate-limit backoff
 
+### Migration Config
+Before running the script, create a config file with:
+- **People list**: Array of names that should be mapped to the `people` table (e.g., `["Sophie", "Emma", "Grandma"]`). Any Tumblr tag matching a name in this list becomes a `people` entry; all other tags become `tags` entries.
+- Tumblr blog identifier
+- R2 credentials
+- Turso connection info
+
 ### Data Flow
 1. Script paginates all posts via Tumblr API
-2. Extracts: title, body/caption, timestamp, media URLs, tags, post type
+2. Extracts: title, body/caption, timestamp, media URLs, tags, post type, `photoset_layout`
 3. Sanitizes HTML in captions/bodies (DOMPurify or similar — strip unsafe tags, preserve basic formatting)
-4. Downloads all media (photos/videos), uploads to R2
-5. Generates thumbnails via `sharp` during upload, stores as separate R2 keys
-6. Maps Tumblr post types: photo/video → `photo`/`video`/`mixed`; text/quote/link/answer → `text`
-7. Month/year tags (aug2013, oct2024) → parsed into post `date` field
-8. All other tags → `tags` table
-9. Auto-generates slug from post title (untitled posts get date-based slug like `2023-10-15`)
-10. Writes records to Turso
-11. Outputs summary: post count by type, media count, tags imported, any skipped items with reasons
-12. **Immediately after**: run `turso db dump` to create a baseline backup of all imported data
+4. Downloads all media (photos/videos), records `file_size` in bytes
+5. Uploads originals to R2 as `media/{media_id}/original.{ext}`
+6. Generates photo thumbnails via `sharp`, video poster frames via `ffmpeg`; uploads as `media/{media_id}/thumb.{ext}`
+7. Maps Tumblr post types: photo/video → `photo`/`video`/`mixed`; text/quote/link/answer → `text`
+8. Month/year tags (aug2013, oct2024) → parsed into post `date` field
+9. Tags matching the people list → `people` table + `post_people` junction
+10. All other tags → `tags` table + `post_tags` junction (with auto-generated slugs)
+11. Auto-generates slug from post title; untitled posts get date-based slug (`2023-10-15`). Duplicates get suffix (`-2`, `-3`)
+12. Writes records to Turso (including FTS5 sync via triggers)
+13. Outputs summary: post count by type, media count, people imported, tags imported, any skipped items with reasons
+14. **Immediately after**: run `turso db dump` to create a baseline backup of all imported data
 
 ### Key Constraints
 - Tumblr strips EXIF data — use API timestamps for post dates
@@ -337,8 +389,15 @@ My reaction:
 <meta property="og:site_name" content="The Hoecks" />
 ```
 
-### Privacy Note
-Post pages must be publicly accessible by URL (for iMessage crawler to generate preview cards), but not indexed/discoverable. All listing/browsing pages remain behind auth. Non-sequential nanoid-based slugs prevent enumeration of the archive.
+### Privacy & Crawler Blocking
+Post pages must be publicly accessible by URL (for iMessage crawler to generate preview cards), but not indexed/discoverable by search engines. Three layers of protection:
+1. **`robots.txt`** (Phase 1): Blocks well-behaved crawlers from the entire site
+2. **`<meta name="robots" content="noindex, nofollow">`**: On individual post pages — tells search engines not to index even if they find the page
+3. **`X-Robots-Tag: noindex`** response header: Belt-and-suspenders for crawlers that don't parse HTML meta tags
+
+iMessage and social media crawlers (iMessage, Facebook, Twitter) intentionally ignore `robots.txt` to generate link previews — this is the desired behavior. Search engines (Google, Bing) respect `robots.txt` and `noindex` — they won't index the content.
+
+All listing/browsing pages remain behind auth. Non-sequential nanoid-based slugs prevent enumeration of the archive.
 
 ### Desktop Fallback
 "To share your thoughts, text us at [number(s)] and mention the photo title"
@@ -351,11 +410,12 @@ Post pages must be publicly accessible by URL (for iMessage crawler to generate 
 2. Tap Share → "Post to Family Album"
 3. Mini form: title (optional), tags, people
 4. Shortcut calls `GET /api/presigned-upload` (Bearer token auth)
-5. API returns presigned R2 URL per file
+5. API returns presigned R2 URL per file (using key convention `media/{media_id}/original.{ext}`)
 6. Shortcut uploads each file directly to R2
 7. Shortcut calls `POST /api/posts` with metadata + media keys
-8. Post created; upload continues in background if user switches apps
-9. EXIF date extracted from selected media → pre-fills post date
+8. Server generates thumbnails via `sharp` (photos) or accepts client-provided poster frame (videos)
+9. Post created; upload continues in background if user switches apps
+10. EXIF date extracted from selected media → pre-fills post date
 
 ---
 
@@ -379,7 +439,7 @@ ADMIN_PASSWORD             = [random string — for admin panel access]
 NEXT_PUBLIC_SITE_URL       = https://dev.thehoecks.com
 
 # Operational settings (stored in DB site_settings table — admin-changeable)
-# viewer_password          → shared family password
+# viewer_password_hash     → bcrypt hash of shared family password
 # imessage_recipients      → comma-separated phone numbers
 # site_title               → "The Hoecks"
 # site_description         → for OG meta tags
@@ -474,7 +534,7 @@ Things that are good ideas but not needed to ship v1. Schema can accommodate the
 
 ### Media
 - Video thumbnail selection from frame picker (v1: auto poster frame)
-- Multiple thumbnail sizes (feed vs. lightbox vs. OG)
+- Multiple thumbnail sizes (feed vs. lightbox vs. OG) — R2 key convention already supports this (`media/{id}/thumb_lg.{ext}`, etc.)
 - HEIC → JPEG conversion on upload for broader compatibility
 
 ### Analytics (lightweight)
@@ -504,3 +564,7 @@ Things that are good ideas but not needed to ship v1. Schema can accommodate the
 13. ~~Invite system?~~ → Token-based links (`/invite/[token]`), admin can label/expire/revoke, plus shared password fallback
 14. ~~Design?~~ → Same dark theme concept but refined/sharper; grid/mosaic for multi-photo; full-screen lightbox on click
 15. ~~Admin console?~~ → Yes — settings page in admin panel for password, invites, iMessage numbers, site metadata
+16. ~~Thumbnail flow?~~ → Server-side `sharp` after R2 upload; video poster frames via client-side canvas (migration uses ffmpeg locally)
+17. ~~People vs. tags?~~ → Pre-defined people list in migration config; script maps matching Tumblr tags to `people` table
+18. ~~Crawler blocking?~~ → `robots.txt` + `noindex` meta + `X-Robots-Tag` header
+19. ~~Password storage?~~ → bcrypt hashed in `site_settings`, never plaintext
