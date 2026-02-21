@@ -1,6 +1,6 @@
 # Family Photo Album - Project Plan
 
-## Status: Planning Phase (Iterating)
+## Status: Planning Phase (Iterating — Review 2)
 
 **Goal:** Replace the Tumblr-hosted family photo archive at thehoecks.com (~15 years, hundreds of posts, ~260 videos) with a custom self-hosted platform offering privacy controls, direct iPhone uploads, and family-specific features.
 
@@ -57,7 +57,11 @@ A Tumblr-hosted family photo blog running since ~2012, using a custom dark theme
 | Hosting | Vercel (free tier) | Smoother Next.js support, auto-deploy |
 | Media storage | Cloudflare R2 | Zero egress fees — critical for a media site |
 | Database | Turso (SQLite) | Simple, free tier, FTS5 built-in |
-| Frontend | Next.js (App Router) + Tailwind CSS | Modern, SSR, image optimization |
+| Frontend | Next.js (App Router) + Tailwind CSS | Modern, SSR, dark theme from start |
+| Image optimization | Pre-generated via `sharp`, stored in R2 | Vercel free tier caps at 1,000/month — too low for photo site |
+| Post IDs | nanoid (non-sequential random) | Public post pages need non-guessable IDs |
+| Post URLs | Slug-based (`/posts/happy-steaksgiving`) | Human-readable, better iMessage previews |
+| Feed pagination | Cursor-based infinite scroll | Home: newest-first; month pages: oldest-first |
 | Auth (browser) | Session JWT / cookie-based | Simple family access |
 | Auth (API) | Bearer token (ADMIN_API_TOKEN) | iOS Shortcut requirement |
 | User accounts | Single shared password | "One password, everyone's in" — no individual accounts |
@@ -81,11 +85,12 @@ A Tumblr-hosted family photo blog running since ~2012, using a custom dark theme
 - **Tailwind CSS** for styling
 - Dark theme matching current aesthetic
 
-### Media Storage
+### Media Storage & Optimization
 - **Cloudflare R2** bucket: `thehoecks-media`
 - Public access enabled for direct CDN URLs
 - Zero egress fees (vs AWS S3 which charges per download)
 - Presigned upload URLs for both admin panel and iOS Shortcut
+- **Image optimization**: Pre-generate thumbnails/web-optimized versions via `sharp` at upload time, stored alongside originals in R2. Serves pre-built versions directly — does NOT rely on Vercel/Next.js Image optimization (free tier caps at 1,000 optimizations/month, far too low for a photo site)
 
 ### Database
 - **Turso** (SQLite) with FTS5 full-text search
@@ -103,18 +108,20 @@ A Tumblr-hosted family photo blog running since ~2012, using a custom dark theme
 
 ```sql
 posts
-├── id (PK)
+├── id (PK, nanoid — non-sequential random string)
+├── slug (string, unique — URL-friendly, auto-generated from title, editable)
 ├── title (string, optional)
-├── body (string, optional)
+├── body (text, optional — sanitized HTML)
 ├── date (datetime — from EXIF, Tumblr metadata, or manual override)
-├── type (enum: photo | video | mixed)
+├── type (enum: photo | video | mixed | text)
 ├── created_at (datetime)
 ├── updated_at (datetime)
 
 media
-├── id (PK)
+├── id (PK, nanoid)
 ├── post_id (FK → posts)
-├── r2_key (string, path in R2 bucket)
+├── r2_key (string, path to original in R2 bucket)
+├── thumbnail_r2_key (string, path to optimized/thumbnail version in R2)
 ├── type (enum: photo | video)
 ├── width (integer)
 ├── height (integer)
@@ -123,7 +130,7 @@ media
 ├── mime_type (string)
 
 tags
-├── id (PK)
+├── id (PK, nanoid)
 ├── name (string, unique)
 ├── created_at (datetime)
 
@@ -132,7 +139,7 @@ post_tags (junction)
 ├── tag_id (FK → tags)
 
 people
-├── id (PK)
+├── id (PK, nanoid)
 ├── name (string)
 ├── created_at (datetime)
 
@@ -141,9 +148,10 @@ post_people (junction)
 ├── person_id (FK → people)
 
 albums
-├── id (PK)
+├── id (PK, nanoid)
 ├── title (string)
 ├── description (string, optional)
+├── cover_media_id (FK → media, nullable — defaults to most recent photo in album)
 ├── created_at (datetime)
 
 post_albums (junction)
@@ -158,6 +166,11 @@ posts_fts (FTS5 virtual table)
 ```
 
 **Key design notes:**
+- **IDs**: All primary keys use nanoid (non-sequential random strings). Since post pages are publicly accessible for iMessage OG previews, sequential IDs would make the entire archive guessable/scrapeable.
+- **Slugs**: Posts have URL-friendly slugs (`/posts/happy-steaksgiving-2025`) auto-generated from title. Slug is used in URLs; nanoid is the internal PK for foreign keys. Duplicate titles get a suffix (`-2`, `-3`).
+- **Thumbnails**: `thumbnail_r2_key` stores pre-generated optimized versions (photos) and poster frames (videos). Generated via `sharp` at upload time, not on-the-fly — avoids Vercel's 1,000/month image optimization cap on free tier.
+- **Post type `text`**: Covers imported Tumblr text, quote, link, and answer post types (all fundamentally text with optional metadata). Audio posts skipped unless present.
+- **Album covers**: `cover_media_id` points to an existing media item. Default: most recent photo in the album. Admin UI allows override.
 - Month/year tags (e.g., "aug2013") are NOT imported as tags — they become the post `date` field
 - All thematic tags (school, perform, travel, etc.) migrate as-is
 - FTS5 virtual table created at schema init
@@ -166,41 +179,51 @@ posts_fts (FTS5 virtual table)
 
 ## 5. Build Phases
 
-### Phase 1 — Foundation
+### Phase 1 — Foundation & Schema
 - Initialize Next.js + Tailwind at `apps/thehoecks/`
-- Turso connection, schema setup, migrations
+- Turso connection + **all schema setup** (all tables, FTS5, indexes)
 - Auth: session cookies + Bearer token validation
 - All routes protected; admin routes gated separately
-- Dark theme skeleton layout
+- Dark theme skeleton layout (base colors, typography, spacing — applied from the start)
 
-### Phase 2 — Data Model + Minimal Feed
-- Schema initialization (all tables + FTS5)
-- Seed with 2-3 dummy posts
-- Basic chronological feed rendering (unstyled)
+### Phase 2 — Minimal Feed (Validation Surface)
+- Seed with 2-3 dummy posts (photo, video, text)
+- Basic chronological feed rendering using the dark theme
 - Purpose: validation surface for migration testing
 
 ### Phase 3 — Migration Script
 - Node.js local script (run once on your machine)
 - Tumblr API v2 pagination with rate-limit handling
-- All media downloaded directly to R2
+- Handles all Tumblr post types: photo/video → `photo`/`video`/`mixed`; text/quote/link/answer → `text` type
+- **HTML sanitization**: Strip unsafe markup from Tumblr captions/bodies on import (DOMPurify or similar)
+- All media downloaded and uploaded to R2, with thumbnails pre-generated via `sharp` during migration
 - Post dates from Tumblr metadata (not EXIF — Tumblr strips it)
 - Month/year tags → post `date` field; thematic tags preserved
-- Output summary for validation before cutover
+- Auto-generate slug from post title (or date-based fallback for untitled posts)
+- Output summary for validation (post count by type, media count, skipped items with reasons)
+- **Post-migration backup**: Run `turso db dump` immediately after migration to snapshot the baseline
 
-### Phase 4 — Public Site
-- Polished chronological feed
+### Phase 4 — Public Site (styled from the start)
+- Dark theme applied as pages are built (not deferred to a later phase)
+- Polished chronological feed with **cursor-based infinite scroll**
+  - **Home feed**: newest-first, cursor = `posted_at` timestamp
+  - **Month/year pages**: oldest-first (Oct 1 → Oct 31), cursor walks forward through the range
 - Year/month timeline navigation
-- Tag pages, album pages, people pages
-- Individual post page (photo + video)
+- Tag pages, album pages (with cover images), people pages
+- Individual post page with slug-based URLs (`/posts/happy-steaksgiving-2025`)
 - Full-text search via FTS5
 - iMessage "text us about this" button on post pages
 - OpenGraph meta tags for iMessage preview cards
+- Lazy loading, responsive images served from R2 (pre-generated thumbnails, not Vercel image optimization)
+- Mobile-first responsive design
 
 ### Phase 5 — Admin Panel
 - Presigned R2 upload flow (direct browser → R2)
+- Thumbnail generation via `sharp` on upload (stored in R2 alongside original)
 - Multi-file upload form: title, date override, tags, people, album
 - Display order drag-to-reorder for multi-photo posts
-- Video support with poster frame selection
+- Video support with poster frame selection (stored as `thumbnail_r2_key`)
+- Album cover selection (defaults to most recent, manually overridable)
 - Edit and delete existing posts
 - Responsive web (not PWA)
 
@@ -211,10 +234,11 @@ posts_fts (FTS5 virtual table)
 - Supports: single photo, multi-photo, video, mixed
 - EXIF date extraction → pre-fills post date
 
-### Phase 7 — Design & Polish
-- Full dark theme, mobile-first
-- Lazy loading, responsive images (Next.js Image)
-- Performance optimization with real content
+### Phase 7 — Performance & Polish
+- Performance optimization with real content (no visual redesign — styling was applied in Phase 4)
+- Loading states and perceived performance improvements
+- Final cross-browser and mobile testing
+- Accessibility pass
 
 ### Phase 8 — Go Live
 - DNS update: thehoecks.com → Vercel production
@@ -231,16 +255,22 @@ posts_fts (FTS5 virtual table)
 
 ### Data Flow
 1. Script paginates all posts via Tumblr API
-2. Extracts: title, body/caption, timestamp, media URLs, tags
-3. Downloads all media (photos/videos) directly to R2
-4. Month/year tags (aug2013, oct2024) → parsed into post `date` field
-5. All other tags → `tags` table
-6. Writes records to Turso
-7. Outputs summary for validation before cutover
+2. Extracts: title, body/caption, timestamp, media URLs, tags, post type
+3. Sanitizes HTML in captions/bodies (DOMPurify or similar — strip unsafe tags, preserve basic formatting)
+4. Downloads all media (photos/videos), uploads to R2
+5. Generates thumbnails via `sharp` during upload, stores as separate R2 keys
+6. Maps Tumblr post types: photo/video → `photo`/`video`/`mixed`; text/quote/link/answer → `text`
+7. Month/year tags (aug2013, oct2024) → parsed into post `date` field
+8. All other tags → `tags` table
+9. Auto-generates slug from post title (untitled posts get date-based slug like `2023-10-15`)
+10. Writes records to Turso
+11. Outputs summary: post count by type, media count, tags imported, any skipped items with reasons
+12. **Immediately after**: run `turso db dump` to create a baseline backup of all imported data
 
 ### Key Constraints
 - Tumblr strips EXIF data — use API timestamps for post dates
 - Videos stored directly in R2 (no transcoding)
+- Audio posts: skip unless present in the archive (log if encountered)
 - Validation step: review post count, media, dates before going live
 
 ---
@@ -255,7 +285,7 @@ posts_fts (FTS5 virtual table)
 
 ### Pre-filled Message
 ```
-https://thehoecks.com/posts/[post-id]
+https://thehoecks.com/posts/[post-slug]
 
 My reaction:
 [cursor here]
@@ -271,7 +301,7 @@ My reaction:
 ```
 
 ### Privacy Note
-Post pages must be publicly accessible by URL (for iMessage crawler to generate preview cards), but not indexed/discoverable. All listing/browsing pages remain behind auth.
+Post pages must be publicly accessible by URL (for iMessage crawler to generate preview cards), but not indexed/discoverable. All listing/browsing pages remain behind auth. Non-sequential nanoid-based slugs prevent enumeration of the archive.
 
 ### Desktop Fallback
 "To share your thoughts, text us at [number] and mention the photo title"
@@ -357,15 +387,35 @@ NEXT_PUBLIC_SITE_URL       = https://dev.thehoecks.com
 
 ---
 
-## 12. Open Questions / Items to Revisit
+## 12. Backup Strategy
+
+### Baseline
+- Run `turso db dump` immediately after migration completes — this is the known-good snapshot of 15 years of imported data
+- Store the dump file locally and/or in R2
+
+### Ongoing
+- Periodic `turso db dump` (can be scripted or manual)
+- R2 media is durable by design (Cloudflare's infrastructure), but the database linking everything together is the single point of failure
+- Consider a simple cron or manual reminder to dump monthly
+
+---
+
+## 13. Open Questions / Items to Revisit
 
 1. ~~Who uploads?~~ → Tom primarily, via admin panel + iOS Shortcut
 2. ~~Privacy level?~~ → Protected. Single shared family password for viewers.
 3. ~~Domain?~~ → thehoecks.com (same domain)
 4. ~~Budget?~~ → ~$0-2/month
 5. ~~Tech stack?~~ → Next.js + Vercel + R2 + Turso (decided)
-6. iMessage recipient: single phone number or shared address? (TBD)
-7. Tumblr blog handle: exact identifier needed for API (e.g., thehoecks.tumblr.com)
-8. Should existing Tumblr URLs redirect to new site?
-9. Invite system details: link format, expiry?
-10. Any changes to the plan after this review?
+6. ~~Post IDs?~~ → nanoid (non-sequential, non-guessable)
+7. ~~Image optimization?~~ → Pre-generated via sharp, stored in R2 (not Vercel)
+8. ~~Feed pagination?~~ → Cursor-based infinite scroll; newest-first on home, oldest-first on month pages
+9. ~~Non-photo Tumblr posts?~~ → Import as `text` type; skip audio unless present
+10. iMessage recipient: single phone number or shared address? (TBD)
+11. Tumblr blog handle: exact identifier needed for API (e.g., thehoecks.tumblr.com)
+12. Should existing Tumblr URLs redirect to new site?
+13. Invite system details: link format, expiry?
+14. **Design — pending Tom's input:**
+    - Dark theme: keep current Tumblr look, or refreshed/different direction?
+    - Multi-photo layout: grid/mosaic, vertical stack, or carousel?
+    - Photo click behavior: lightbox, navigate to post page, or both?
