@@ -162,6 +162,24 @@ Reason: Standard SQLite approach for FTS5 with non-integer PKs (nanoid text PK)
 Alternatives Considered: Regular FTS5 table, separate search index
 Impact: Requires sync triggers on INSERT/UPDATE/DELETE; content_rowid=rowid (implicit integer)
 
+### 2025-01-01
+Decision: Project lives at `apps/thehoecks/` in the monorepo
+Reason: Alongside other apps in `tom-playground` monorepo
+Alternatives Considered: Separate repository, root-level project
+Impact: Vercel root directory set to `apps/thehoecks`; deploy workflow scoped to `apps/**`
+
+### 2025-01-01
+Decision: EXIF date extraction on new posts via iOS (not server)
+Reason: iOS natively provides EXIF data; avoids server-side EXIF parsing
+Alternatives Considered: Server-side EXIF extraction after upload
+Impact: iOS Shortcut pre-fills post date from EXIF; admin panel allows manual date override
+
+### 2025-01-01
+Decision: Admin settings stored in DB `site_settings` table, not env vars
+Reason: Change password, manage invites, update iMessage numbers — no redeploy needed
+Alternatives Considered: Environment variables for all settings, config file
+Impact: Admin panel settings page required; viewer password, iMessage recipients, site metadata all runtime-changeable
+
 ## Open Questions
 
 - Tumblr blog handle: exact identifier needed for API — **pending from Tom** (currently hardcoded as `www.thehoecks.com` in migration script)

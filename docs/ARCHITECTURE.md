@@ -76,7 +76,7 @@ Client request → Middleware (JWT check) → Next.js API → Turso query → R2
 4. API route fetches original from R2, generates thumbnail via `sharp`, uploads thumbnail to R2
 5. API saves post record with both R2 keys
 
-Step 4 constraints: R2 → Vercel fetch is fast (Cloudflare network), `sharp` resizes typical iPhone photo (3-8MB) in <1 second, thumbnail upload (~100KB) near-instant. Within Vercel 10-second function timeout.
+Step 4 constraints: R2 → Vercel fetch is fast (Cloudflare network), `sharp` resizes typical iPhone photo (3-8MB) in <1 second, thumbnail upload (~100KB) near-instant. Within Vercel 10-second function timeout. For unusually large files, the API can stream the download rather than buffering the full file.
 
 ### Video Handling
 - **Migration**: `ffmpeg` locally extracts poster frame
@@ -85,13 +85,13 @@ Step 4 constraints: R2 → Vercel fetch is fast (Cloudflare network), `sharp` re
 
 ### Tumblr Migration
 
-**API**: Tumblr v2 API (`/v2/blog/{blog-identifier}/posts`) with OAuth credentials (Consumer Key + Consumer Secret). Paginate with rate-limit backoff.
+**API**: Tumblr v2 API (`/v2/blog/{blog-identifier}/posts`). OAuth credentials required: Consumer Key + Consumer Secret. Paginate with rate-limit backoff.
 
 **Migration Config** (required before running):
 - People list: array of names to route to `people` table (e.g., `["Sophie", "Emma", "Grandma"]`)
-- Tumblr blog identifier
-- R2 credentials
-- Turso connection info
+- Tumblr blog identifier (e.g., `thehoecks.tumblr.com`)
+- R2 credentials (account ID, access key, secret key, bucket name)
+- Turso connection info (database URL, auth token)
 
 **Staged Testing** (run against real Tumblr API):
 1. 10 posts: Verify data flow — check DB records, R2 media, thumbnails, tags, people mapping
@@ -119,12 +119,27 @@ Step 4 constraints: R2 → Vercel fetch is fast (Cloudflare network), `sharp` re
 ## Integrations
 
 ### iMessage Feedback System
-- **Button**: "Text us about this" (green, prominent) on post pages
+- **Button**: "Text us about this" (green, iMessage system color, large and obvious)
+  - Sub-text: "Opens a text message on your phone"
+  - Placement: Below photo(s) on individual post page
 - **Recipients**: Group message via `sms:+1XXXXXXXXXX,+1YYYYYYYYYY&body=...`
 - **Numbers**: Stored in `site_settings` (`imessage_recipients`), admin-changeable
-- **Pre-filled message**: Post URL + "My reaction:" + cursor
-- **Desktop fallback**: Text instruction with phone numbers and post title
-- **OG tags**: title, description ("Posted [date]"), image (first media), URL, site_name
+- **Pre-filled message**:
+  ```
+  https://thehoecks.com/posts/[post-slug]
+
+  My reaction:
+  [cursor here]
+  ```
+- **Desktop fallback**: "To share your thoughts, text us at [number(s)] and mention the photo title"
+- **OG tags**:
+  ```html
+  <meta property="og:title" content="[post title]" />
+  <meta property="og:description" content="Posted [date]" />
+  <meta property="og:image" content="[first media URL]" />
+  <meta property="og:url" content="[post URL]" />
+  <meta property="og:site_name" content="The Hoecks" />
+  ```
 
 ### iOS Shortcut
 1. Select photos/videos → Share → "Post to Family Album"
@@ -213,11 +228,11 @@ posts_fts (FTS5, external content mode, content=posts, content_rowid=rowid)
 
 ### Data Model Notes
 - **IDs**: nanoid everywhere — non-sequential prevents archive enumeration since post pages are publicly accessible
-- **Slugs**: Posts, tags, people, albums all have auto-generated slugs. Duplicate titles → suffix (`-2`, `-3`). Untitled posts → date-based slug (`2023-10-15`)
+- **Slugs**: Posts, tags, people, albums all have auto-generated slugs. Duplicate titles → suffix (`-2`, `-3`). Untitled posts → date-based slug (`2023-10-15`, `2023-10-15-2`)
 - **Thumbnails**: Pre-generated via `sharp` — avoids Vercel 1,000/month image optimization cap
 - **File size**: Populated at upload time for storage monitoring and validation
 - **Photoset layout**: Tumblr format string preserved during migration; new posts can set manually or auto-calculate
-- **Post type `text`**: Covers imported Tumblr text, quote, link, and answer types. Audio posts skipped unless present.
+- **Post type `text`**: Covers imported Tumblr text, quote, link, and answer types. Audio posts skipped unless present (log if encountered).
 - **Album covers**: Points to existing media item. Default: most recent photo. Admin-overridable.
 - **Password hashing**: bcrypt hash in `site_settings`, never plaintext
 - **Month/year tags**: NOT imported as tags — become post `date` field
@@ -283,7 +298,7 @@ NEXT_PUBLIC_SITE_URL       = https://dev.thehoecks.com
 
 ### Backup Strategy
 - **Baseline**: `turso db dump` immediately after migration — known-good snapshot
-- **Ongoing**: Periodic `turso db dump` (manual or scripted)
+- **Ongoing**: Periodic `turso db dump` — manual monthly reminder for v1; automated cron in V2 backlog
 - R2 media is durable (Cloudflare infrastructure); database is single point of failure
 - Store dumps locally and/or in R2
 

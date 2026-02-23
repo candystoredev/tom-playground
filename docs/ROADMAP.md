@@ -101,9 +101,11 @@ Responsive web throughout (not PWA). Each sub-slice builds on previous.
 
 ## Backlog (V2 — Post-Launch)
 
+Schema can accommodate all V2 features without breaking changes.
+
 ### Category Management
-- Tag display names, descriptions, custom sort order
-- People profiles (display name, photo, description, sort order)
+- Tag display names (e.g., "perform" → "Performances"), descriptions, custom sort order
+- People profiles (display name, `profile_photo_r2_key`, description, sort order)
 - Album custom sort order
 
 ### Admin Enhancements
@@ -126,7 +128,7 @@ Responsive web throughout (not PWA). Each sub-slice builds on previous.
 
 ### Media
 - Video thumbnail frame picker (v1: auto poster frame)
-- Multiple thumbnail sizes (feed vs. lightbox vs. OG)
+- Multiple thumbnail sizes (feed vs. lightbox vs. OG) — R2 key convention supports this (`media/{id}/thumb_lg.{ext}`, etc.)
 - HEIC → JPEG conversion on upload
 
 ### Analytics (Lightweight)
