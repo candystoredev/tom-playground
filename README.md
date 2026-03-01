@@ -9,13 +9,10 @@ Private photo album replacing a Tumblr blog. Auth-protected, dark theme, iMessag
 
 **Stack**: Next.js (App Router) + Tailwind CSS + Turso (SQLite) + Cloudflare R2 + Vercel
 
-### `apps/hello/` — Static HTML
-Minimal static page.
-
 ## Setup
 
 ```bash
-# Install dependencies (thehoecks app)
+# Install dependencies
 cd apps/thehoecks && npm install
 
 # Run dev server
@@ -30,25 +27,24 @@ npm run migrate:dry  # dry-run mode
 
 ```
 tom-playground/
+├── CLAUDE.md                # AI agent orientation guide
 ├── apps/
-│   ├── thehoecks/        # Family photo album (Next.js)
-│   │   ├── src/
-│   │   │   ├── app/      # Pages and API routes
-│   │   │   ├── components/
-│   │   │   └── lib/      # DB, auth, R2, schema
-│   │   └── scripts/      # Migration script
-│   └── hello/            # Static HTML app
-├── docs/                 # Project documentation
-│   ├── ARCHITECTURE.md   # System design and data model
-│   ├── ROADMAP.md        # Feature phases and backlog
-│   ├── DECISIONS.md      # Technical decision log
-│   └── STATE.md          # Current working state (AI handoff file)
-└── .github/workflows/    # CI/CD
+│   └── thehoecks/           # Family photo album (Next.js)
+│       ├── docs/            # Project documentation
+│       │   ├── ARCHITECTURE.md  # System design and data model
+│       │   ├── ROADMAP.md       # Feature phases and backlog
+│       │   ├── DECISIONS.md     # Technical decision log
+│       │   └── STATE.md         # Current working state (AI handoff file)
+│       ├── src/
+│       │   ├── app/         # Pages and API routes
+│       │   ├── components/  # React components
+│       │   └── lib/         # DB, auth, R2, schema
+│       ├── scripts/         # Migration script
+│       └── tests/           # Automated tests
+└── .github/workflows/       # CI/CD
 ```
 
 ## Deployment
 
 Push to branch → Vercel auto-builds `apps/thehoecks/` → `dev.thehoecks.com`
 Merge to master → auto-deployed to `thehoecks.com`
-
-Static apps deploy to Bluehost via GitHub Actions.

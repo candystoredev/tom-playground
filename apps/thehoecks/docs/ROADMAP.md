@@ -38,16 +38,15 @@
 
 ## In Progress
 
-_None currently active._
-
-## Planned
-
 ### Phase 4 — Public Site
 Dark theme: same concept as Tumblr, refined/sharper/modern. Mobile-first. Each sub-slice deployed and verified before next.
 
-- **4a**: Polished feed + cursor-based infinite scroll (newest-first home, lazy loading thumbnails)
-  - Verify: Scroll loads next page seamlessly, no dupes, no skips, works on phone
-  - Test: Automated cursor pagination test (50+ posts, same-timestamp posts, correct order)
+- **4a** ~~Polished feed + cursor-based infinite scroll~~ — **DONE**
+  - Cursor-based pagination with `(date, id)` tiebreaker
+  - IntersectionObserver infinite scroll with 600px lookahead
+  - SSR first page, client-side subsequent pages via `/api/feed`
+  - Edge-to-edge images on mobile, rounded corners on desktop
+  - 25-post seed script for testing pagination
 - **4b**: Post page at `/posts/{slug}` + OG tags + iMessage button + desktop fallback
   - Verify: Paste URL in iMessage → preview card with photo + title. Tap iMessage button on phone → opens pre-filled text
   - Test: `curl` post page → verify OG tags in HTML
@@ -75,6 +74,9 @@ Responsive web throughout (not PWA). Each sub-slice builds on previous.
 - **5d**: Settings page (change viewer password, manage invite links, update iMessage numbers, edit site metadata)
   - Verify: Change password → old fails, new works. Create invite → incognito auto-auth. Revoke → rejected. Update iMessage → reflected
   - Test: Automated auth middleware tests (viewer JWT blocked from admin, expired/revoked invites rejected, valid invite sets cookie)
+- **5e**: Tech stack overview page — at-a-glance view of infrastructure (Vercel, Turso, R2, Doppler, domain/DNS)
+- **5f**: Changelog — track what's been built and when, visible from admin UI
+- **5g**: Admin tabs — separate tabs for Settings, Tech Stack, Changelog
 
 ### Phase 6 — iOS Shortcut
 - Shortcut definition + setup guide

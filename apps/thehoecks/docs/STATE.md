@@ -1,13 +1,13 @@
 # State
 
 ## Current Status
-Phases 1-3 complete. Phase 4a (polished feed + cursor-based infinite scroll) implemented. Feed uses cursor-based pagination with `(date, id)` tiebreaker, IntersectionObserver-based infinite scroll, sticky header, and polished dark theme styling.
+Phases 1-3 complete. Phase 4a (polished feed + cursor-based infinite scroll) implemented and deployed. Feed uses cursor-based pagination with `(date, id)` tiebreaker, IntersectionObserver-based infinite scroll, sticky header, edge-to-edge images on mobile, and polished dark theme styling. 25-post seed script for testing pagination.
 
 ## Active Branch
 claude/family-photo-album-plan-rEoOE
 
 ## Current Task
-Phase 4a complete — ready for verification, then Phase 4b
+Phase 4a complete — verifying infinite scroll with expanded seed data, then Phase 4b
 
 ## Blockers
 - Tumblr blog handle not yet confirmed by Tom (migration script has `www.thehoecks.com` hardcoded)
@@ -15,12 +15,19 @@ Phase 4a complete — ready for verification, then Phase 4b
 ## Known Issues
 - No individual post pages
 - No OG tags for iMessage previews
-- Seed test posts from Phase 2 must be deleted before running real migration
+- Seed test posts must be deleted before running real migration
 - PEOPLE set in migration script is empty (needs family names from Tom)
 - FTS5 tags field always inserts empty string (trigger doesn't join tag names)
 
 ## Next Action
 Verify Phase 4a (scroll loads next page seamlessly, no dupes/skips, works on phone), then begin Phase 4b (post pages + OG tags)
+
+## Recent Changes
+- Expanded seed script from 3 to 25 posts spanning 2023-2025 with varied layouts
+- Edge-to-edge images on mobile (negative margins), rounded corners on desktop only
+- PAGE_SIZE restored to 20 for proper pagination testing
+- Consolidated project docs under `apps/thehoecks/docs/`
+- Created CLAUDE.md for AI agent orientation
 
 ## Relevant Files
 - `apps/thehoecks/src/app/page.tsx` — home feed (SSR first page)
@@ -37,7 +44,7 @@ Verify Phase 4a (scroll loads next page seamlessly, no dupes/skips, works on pho
 - `apps/thehoecks/src/components/LogoutButton.tsx` — logout UI
 - `apps/thehoecks/src/components/SeedButton.tsx` — seed test data UI
 - `apps/thehoecks/src/app/api/init/route.ts` — schema init + settings seed
-- `apps/thehoecks/src/app/api/seed/route.ts` — test data seeder
+- `apps/thehoecks/src/app/api/seed/route.ts` — test data seeder (25 posts)
 - `apps/thehoecks/src/app/api/auth/login/route.ts` — login endpoint
 - `apps/thehoecks/src/app/api/auth/logout/route.ts` — logout endpoint
 - `apps/thehoecks/src/app/robots.txt/route.ts` — crawler blocking
@@ -45,7 +52,7 @@ Verify Phase 4a (scroll loads next page seamlessly, no dupes/skips, works on pho
 
 ## AI Guardrails
 Assumptions:
-- Phases 1-3 are considered complete per PLAN.md phase definitions
+- Phases 1-3 are considered complete per ROADMAP.md phase definitions
 - Migration script has not been run against real Tumblr data yet
 - Dev deployment at dev.thehoecks.com is the primary test target
 - Tom is the primary admin user
