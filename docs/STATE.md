@@ -1,19 +1,18 @@
 # State
 
 ## Current Status
-Phases 1-3 complete. Foundation, vertical slice, and migration script implemented. App has auth, dark theme feed, schema with FTS5, R2 integration, and a working Tumblr migration script. Phase 4 (public site polish) is next.
+Phases 1-3 complete. Phase 4a (polished feed + cursor-based infinite scroll) implemented. Feed uses cursor-based pagination with `(date, id)` tiebreaker, IntersectionObserver-based infinite scroll, sticky header, and polished dark theme styling.
 
 ## Active Branch
-master
+claude/family-photo-album-plan-rEoOE
 
 ## Current Task
-Begin Phase 4a — polished feed with cursor-based infinite scroll
+Phase 4a complete — ready for verification, then Phase 4b
 
 ## Blockers
 - Tumblr blog handle not yet confirmed by Tom (migration script has `www.thehoecks.com` hardcoded)
 
 ## Known Issues
-- Feed pagination is basic LIMIT 50, not cursor-based yet
 - No individual post pages
 - No OG tags for iMessage previews
 - Seed test posts from Phase 2 must be deleted before running real migration
@@ -21,10 +20,13 @@ Begin Phase 4a — polished feed with cursor-based infinite scroll
 - FTS5 tags field always inserts empty string (trigger doesn't join tag names)
 
 ## Next Action
-Implement cursor-based pagination in the home feed (Phase 4a)
+Verify Phase 4a (scroll loads next page seamlessly, no dupes/skips, works on phone), then begin Phase 4b (post pages + OG tags)
 
 ## Relevant Files
-- `apps/thehoecks/src/app/page.tsx` — home feed
+- `apps/thehoecks/src/app/page.tsx` — home feed (SSR first page)
+- `apps/thehoecks/src/components/Feed.tsx` — infinite scroll client component
+- `apps/thehoecks/src/app/api/feed/route.ts` — cursor-based feed API
+- `apps/thehoecks/tests/cursor-pagination.test.ts` — cursor pagination tests
 - `apps/thehoecks/src/app/login/page.tsx` — login page
 - `apps/thehoecks/src/middleware.ts` — auth middleware
 - `apps/thehoecks/src/lib/auth.ts` — session/JWT/password logic
