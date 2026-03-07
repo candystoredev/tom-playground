@@ -122,11 +122,23 @@ export default function Lightbox({
     return () => window.removeEventListener("keydown", onKey);
   }, [onClose, goNext, goPrev]);
 
-  // Lock body scroll when open
+  // Lock body scroll and request fullscreen when open
   useEffect(() => {
     document.body.style.overflow = "hidden";
+
+    // Request fullscreen to hide browser chrome (iPad Safari, desktop)
+    const el = document.documentElement;
+    const requestFs = el.requestFullscreen ?? (el as any).webkitRequestFullscreen;
+    if (requestFs) {
+      requestFs.call(el).catch(() => {});
+    }
+
     return () => {
       document.body.style.overflow = "";
+      const exitFs = document.exitFullscreen ?? (document as any).webkitExitFullscreen;
+      if (exitFs && document.fullscreenElement) {
+        exitFs.call(document).catch(() => {});
+      }
     };
   }, []);
 
@@ -229,9 +241,17 @@ export default function Lightbox({
           </button>
         )}
 
-        {/* Incoming image — sits behind current, revealed as current slides away */}
+        {/* Incoming image — slides in from the edge, following the current image like a conveyor belt */}
         {incoming && (offsetX !== 0 || transitioning) && (
-          <div className="absolute inset-0 flex items-center justify-center z-0">
+          <div
+            className="absolute inset-0 flex items-center justify-center z-10"
+            style={{
+              transform: `translateX(${offsetX < 0 ? offsetX + window.innerWidth : offsetX - window.innerWidth}px)`,
+              transition: swiping
+                ? "none"
+                : "transform 0.3s cubic-bezier(0.22, 0.68, 0, 1.0)",
+            }}
+          >
             {incoming.type === "video" ? (
               <video
                 key={incoming.id}
@@ -251,7 +271,7 @@ export default function Lightbox({
           </div>
         )}
 
-        {/* Current image — slides away on swipe, revealing incoming behind it */}
+        {/* Current image — slides out on swipe, incoming follows right behind */}
         <div
           className="w-full h-full flex items-center justify-center relative z-10"
           style={{
