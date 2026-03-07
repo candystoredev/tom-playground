@@ -55,14 +55,19 @@ Dark theme: same concept as Tumblr, refined/sharper/modern. Mobile-first. Each s
   - `photoset_layout` grid rendering matching Tumblr layouts
   - Full-screen lightbox with swipe, keyboard arrows, dot indicators
   - Image preloading, backdrop close, body scroll lock
-- **4d** ~~Tag, People, Album filtered pages~~ — **DONE**
+- **4d** ~~Tag, People, Album filtered pages~~ — **DONE** ✓ verified with real data
   - `/tags/{slug}`, `/people/{slug}`, `/albums/{slug}` with cursor-based infinite scroll
   - Feed API extended with `tag`, `person`, `album` filter params
   - Feed shows clickable `@person` and `#tag` links per post
   - Album cover image display
   - Shared `lib/feed.ts` for server-side feed fetching
-  - Verify: Click tag → filtered posts only. People page correct. Album cover displays. Pagination works within filters
-- **4e**: Year/month timeline navigation + month pages (oldest-first)
+  - Verified: Tag/people/album pages render with real migrated content, pagination works within filters
+- **4e** ~~Year/month timeline navigation + month pages (oldest-first)~~ — **DONE**
+  - Archive index at `/archive` — year/month grid with post counts, only populated months shown
+  - Month pages at `/archive/{year}/{month}` — oldest-first infinite scroll
+  - Previous/next month navigation at bottom of month pages
+  - Feed API extended with `year`+`month` filter params, oldest-first ordering
+  - "Archive" link in home page header
   - Verify: Navigate to month → oldest-first order. Pagination walks forward. No empty months shown
 - **4f**: FTS5 search with highlighted results
   - Verify: Search "birthday" → finds birthday posts. Search person name → finds their posts. Empty search handled
