@@ -21,7 +21,7 @@
 | Database | Turso (SQLite) with FTS5 |
 | Media | Cloudflare R2 (zero egress) |
 | Secrets | Doppler |
-| Domain | thehoecks.com (dev.thehoecks.com for feature branches) |
+| Domain | dev.thehoecks.com (production) |
 
 ## Key Commands
 ```bash
@@ -43,6 +43,7 @@ npm run migrate:dry  # dry-run migration
 8. Don't run the migration script against production without Tom's confirmation
 
 ## Deployment
-- Push to branch → Vercel auto-builds → `dev.thehoecks.com`
-- Merge to master → auto-deployed to `thehoecks.com`
+- `dev.thehoecks.com` is the production site (the old Tumblr site still lives on `www.thehoecks.com`)
+- Push to branch → Vercel auto-builds preview deployments
+- Merge to master → auto-deployed to `dev.thehoecks.com`
 - Vercel root directory is set to `apps/thehoecks`
