@@ -35,6 +35,7 @@
 - Post-migration: `turso db dump` for baseline backup
 - Staged testing: 10 posts → 100 posts → full migration (see ARCHITECTURE.md for details)
 - Verified: Post count matches Tumblr, no orphaned media/records, people/tags split correctly, feed renders all content
+- **2026-03-07**: Full production migration completed, FTS index rebuilt, site live with all content
 
 ## In Progress
 
@@ -63,17 +64,28 @@ Dark theme: same concept as Tumblr, refined/sharper/modern. Mobile-first. Each s
   - Shared `lib/feed.ts` for server-side feed fetching
   - Verified: Tag/people/album pages render with real migrated content, pagination works within filters
 - **4e** ~~Year/month timeline navigation + month pages (oldest-first)~~ — **DONE**
-  - Archive index at `/archive` — year/month grid with post counts, only populated months shown
+  - Floating action button (bottom-right) with hamburger/X toggle, hides on scroll-down, shows on scroll-up
+  - Slide-out panel from left: "The Latest", "Featured" (albums), expandable year/month timeline
+  - Archive API returns years/months with post counts + albums list
+  - Archive index at `/archive` — year/month grid (fallback direct URL)
   - Month pages at `/archive/{year}/{month}` — oldest-first infinite scroll
   - Previous/next month navigation at bottom of month pages
   - Feed API extended with `year`+`month` filter params, oldest-first ordering
-  - "Archive" link in home page header
-  - Verify: Navigate to month → oldest-first order. Pagination walks forward. No empty months shown
-- **4f**: FTS5 search with highlighted results
+  - Verify: FAB visible, slide-out opens with timeline, navigate to month → oldest-first order
+- **4f** ~~FTS5 search~~ — **DONE**
+  - Search bar in slide-out panel, navigates to `/search?q=` results page
+  - Search API at `/api/search` with FTS5 ranking, offset-based "load more" pagination
+  - FTS5 indexes title, body, tags, and people names (standalone table, not trigger-based)
+  - `rebuildFtsIndex()` function; init endpoint rebuilds FTS on deploy
+  - Search results rendered in standard feed format with full media
   - Verify: Search "birthday" → finds birthday posts. Search person name → finds their posts. Empty search handled
-  - Test: Automated FTS5 test (insert posts, verify search results and ranking)
 - **4g**: Crawler blocking hardening (`noindex` meta, `X-Robots-Tag` header)
   - Verify: `curl -H "User-Agent: Googlebot"` → response contains `noindex` meta + `X-Robots-Tag` header. OG tags still work
+- **4h**: Post-migration polish (feedback from real-content review)
+  - Feed image quality: serve originals (or high-res resized) instead of 400px thumbnails in feed
+  - Desktop navigation: persistent left sidebar (semi-transparent, full opacity on hover, tucks away on narrow screens) — matching old Tumblr site UX
+  - Header removal: remove sticky header, replace with optional banner message
+  - Verify: Images sharp on desktop feed. Desktop sidebar visible and interactive. Mobile still uses FAB. No header visible, banner message works when set
 
 ### Phase 5 — Admin Panel & Settings
 Responsive web throughout (not PWA). Each sub-slice builds on previous.

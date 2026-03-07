@@ -49,9 +49,10 @@ Extensible: future variants added as sibling files without schema changes.
 
 ### Database (Turso / SQLite)
 - **Turso** free Starter plan with FTS5 full-text search
-- FTS5 uses external content mode backed by SQLite implicit integer rowid (not nanoid PK)
-- FTS sync triggers on posts INSERT/UPDATE/DELETE
-- Tags denormalized into FTS table as comma-separated string
+- FTS5 standalone table (`posts_fts`) — not external content mode, synced at application level
+- Indexed fields: `post_id` (unindexed key), `title`, `body`, `tags` (space-separated names), `people` (space-separated names)
+- `rebuildFtsIndex()` rebuilds from `posts` + `post_tags`/`tags` + `post_people`/`people` joins
+- Rebuild triggered by `POST /api/init`; future: also after post create/update/delete
 
 ### Authentication & Access Control
 - **Viewer access (two paths)**:
@@ -223,8 +224,9 @@ site_settings (key-value)
 ├── value
 ├── updated_at
 
-posts_fts (FTS5, external content mode, content=posts, content_rowid=rowid)
-├── title, body, tags (denormalized comma-separated)
+posts_fts (FTS5, standalone, application-synced)
+├── post_id (UNINDEXED, FK → posts.id)
+├── title, body, tags (space-separated), people (space-separated)
 ```
 
 ### Data Model Notes
@@ -282,8 +284,8 @@ NEXT_PUBLIC_SITE_URL       = https://dev.thehoecks.com
 ### Setup Steps
 
 **Vercel**: Import GitHub repo `tom-playground` → Root Directory: `apps/thehoecks` → Framework: Next.js
-- Dev: `dev.thehoecks.com` mapped to feature branch
-- Production: `thehoecks.com` mapped to master branch
+- Production: `dev.thehoecks.com` mapped to master branch (old Tumblr site still on `www.thehoecks.com`)
+- Future: `thehoecks.com` will point here at go-live (Phase 8)
 
 **Cloudflare R2**: Create bucket `thehoecks-media` → enable public access → create R2 API token (read + write)
 
@@ -294,8 +296,8 @@ NEXT_PUBLIC_SITE_URL       = https://dev.thehoecks.com
 - Production: Vercel provides A records / CNAME at go-live
 
 ### Pipeline
-- Push to branch → Vercel auto-builds → `dev.thehoecks.com`
-- Merge to master → auto-deployed to `thehoecks.com`
+- Push to branch → Vercel auto-builds preview deployments
+- Merge to master → auto-deployed to `dev.thehoecks.com` (production)
 
 ### Backup Strategy
 - **Baseline**: `turso db dump` immediately after migration — known-good snapshot

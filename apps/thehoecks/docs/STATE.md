@@ -1,29 +1,43 @@
 # State
 
 ## Current Status
-Phases 1-4d complete and verified. Tumblr migration has been run — real content is live on dev.thehoecks.com. Seed test data cleaned. Feed shows tag/people links on every post. Filtered pages at `/tags/{slug}`, `/people/{slug}`, `/albums/{slug}` with cursor-based infinite scroll.
+Phases 1-4 complete. Tumblr migration completed against production on 2026-03-07. All posts migrated, FTS index rebuilt. Site live at dev.thehoecks.com with full content. All crawler blocking layers active site-wide (robots.txt, noindex meta, X-Robots-Tag header).
+
+Phase 4h (post-migration polish) implemented. Ready for review and Phase 5.
 
 ## Active Branch
 claude/family-photo-album-plan-rEoOE
 
 ## Current Task
-Phase 4e deployed — needs verification (archive index, month pages oldest-first, prev/next navigation)
+Phase 4h deployed. Awaiting Tom's review on desktop sidebar, image quality, and header removal. Then Phase 5a.
 
 ## Blockers
 None
 
 ## Known Issues
-- FTS5 tags field always inserts empty string (trigger doesn't join tag names)
+None
 
 ## Next Action
-Verify Phase 4e on dev.thehoecks.com. Then begin Phase 4f (FTS5 search).
+Tom reviews Phase 4h changes on dev.thehoecks.com, then Phase 5a (single photo upload).
 
 ## Recent Changes
+- Phase 4h: Feed images now serve originals instead of 400px thumbnails
+- Phase 4h: Desktop sidebar — persistent left nav at 35% opacity, full on hover (lg+ breakpoint)
+- Phase 4h: Mobile keeps FAB + slide-out panel unchanged
+- Phase 4h: Removed sticky headers from all 8 pages
+- Phase 4h: Added BannerMessage component (reads `banner_message` from site_settings)
+- Phase 4h: Logout + admin badge moved to sidebar bottom
+- 2026-03-07: Full Tumblr migration completed against production, FTS index rebuilt
+- Phase 4f: FTS5 search — search bar in slide-out panel, `/search?q=` results page
+- Phase 4f: Search API at `/api/search` with FTS5 ranking, offset pagination
+- Phase 4f: FTS5 fixed — standalone table indexing title, body, tags, and people names
+- Phase 4e: Floating archive menu button (FAB) with slide-out panel
+- Phase 4e: Panel includes "The Latest", "Featured" (albums), and year/month timeline
+- Phase 4e: FAB hides on scroll-down, shows on scroll-up with jitter threshold
 - Phase 4e: Archive index page at `/archive` — year/month grid with post counts
 - Phase 4e: Month pages at `/archive/{year}/{month}` — oldest-first feed with infinite scroll
 - Phase 4e: Previous/next month navigation on month pages
 - Phase 4e: Feed API extended with `year`+`month` params, oldest-first ordering
-- Phase 4e: "Archive" link in home page header
 - Seed data cleaned from dev site (`DELETE /api/seed?clean=all`) — only real migrated content remains
 - Clean-all seed endpoint added to remove seed posts, media, tags, people, and albums
 - Schema init hardened: tumblr_id index created after migration to avoid conflicts
@@ -48,7 +62,11 @@ Verify Phase 4e on dev.thehoecks.com. Then begin Phase 4f (FTS5 search).
 - `apps/thehoecks/src/app/albums/[slug]/page.tsx` — album filtered page
 - `apps/thehoecks/src/app/archive/page.tsx` — archive index (year/month grid)
 - `apps/thehoecks/src/app/archive/[year]/[month]/page.tsx` — month page (oldest-first)
-- `apps/thehoecks/src/app/api/archive/route.ts` — archive API (years/months/counts)
+- `apps/thehoecks/src/app/api/archive/route.ts` — archive API (years/months/counts + albums)
+- `apps/thehoecks/src/components/ArchiveMenu.tsx` — floating menu button + slide-out panel + search
+- `apps/thehoecks/src/app/api/search/route.ts` — FTS5 search API
+- `apps/thehoecks/src/app/search/page.tsx` — search results page (server wrapper)
+- `apps/thehoecks/src/app/search/SearchResults.tsx` — search results client component
 - `apps/thehoecks/tests/cursor-pagination.test.ts` — cursor pagination tests
 - `apps/thehoecks/src/app/login/page.tsx` — login page
 - `apps/thehoecks/src/middleware.ts` — auth middleware
@@ -71,8 +89,8 @@ Verify Phase 4e on dev.thehoecks.com. Then begin Phase 4f (FTS5 search).
 ## AI Guardrails
 Assumptions:
 - Phases 1-3 are considered complete per ROADMAP.md phase definitions
-- Migration script has not been run against real Tumblr data yet
-- Dev deployment at dev.thehoecks.com is the primary test target
+- Migration has not yet been re-run on production (DB is clean)
+- dev.thehoecks.com is the production site (old Tumblr site still on www.thehoecks.com)
 - Tom is the primary admin user
 
 Constraints:
