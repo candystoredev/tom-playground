@@ -47,3 +47,4 @@ npm run migrate:dry  # dry-run migration
 - Push to branch → Vercel auto-builds preview deployments
 - Merge to master → auto-deployed to `dev.thehoecks.com`
 - Vercel root directory is set to `apps/thehoecks`
+- **Before every merge to master, increment `BUILD_VERSION` in `apps/thehoecks/src/app/layout.tsx`.** It is a zero-padded 6-digit string (e.g. `"000014"` → `"000015"`). This is the only way to confirm a new build is live on the green banner.
