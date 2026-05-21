@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tom's Apps</title>
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect fill='%23c8b8a0' rx='18' width='100' height='100'/><text x='50' y='73' font-family='Georgia,serif' font-size='72' font-weight='bold' fill='white' text-anchor='middle'>T</text></svg>">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Source+Serif+4:wght@600&display=swap" rel="stylesheet">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            min-height: 100vh;
+            background: #f8f7f4;
+            color: #3a3a3a;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 5rem 1.5rem 3rem;
+        }
+        header {
+            text-align: center;
+            margin-bottom: 3.5rem;
+        }
+        header h1 {
+            font-family: 'Source Serif 4', Georgia, serif;
+            font-size: 2rem;
+            font-weight: 600;
+            color: #1a1a1a;
+            letter-spacing: -0.03em;
+        }
+        header .divider {
+            width: 32px;
+            height: 2px;
+            background: #c8b8a0;
+            margin: 1rem auto;
+            border-radius: 1px;
+        }
+        header p {
+            font-size: 0.95rem;
+            color: #888;
+            font-weight: 400;
+        }
+        .grid {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 0.5rem;
+            width: 100%;
+            max-width: 480px;
+        }
+        .card {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            background: #fff;
+            border: 1px solid #e8e4de;
+            border-radius: 10px;
+            padding: 0.7rem 1rem;
+            text-decoration: none;
+            color: inherit;
+            transition: transform 0.15s ease, box-shadow 0.15s ease, border-color 0.15s ease;
+            box-shadow: 0 1px 2px rgba(0,0,0,0.03);
+        }
+        .card:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.06);
+            border-color: #d4cfc6;
+        }
+        .card-icon {
+            width: 34px;
+            height: 34px;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.1rem;
+            flex-shrink: 0;
+        }
+        .card-icon.music { background: #f0e8f7; }
+        .card-icon.bolt  { background: #e6f0e8; }
+        .card-icon.tool  { background: #e8eff7; }
+        .card-icon.game  { background: #f7e8e8; }
+        .card-icon.fire  { background: #f7f0e8; }
+        .card-icon.earth { background: #e8f0e6; }
+        .card-body { flex: 1; min-width: 0; }
+        .card-title {
+            font-size: 0.9rem;
+            font-weight: 600;
+            color: #1a1a1a;
+        }
+        .card-desc {
+            font-size: 0.78rem;
+            color: #999;
+            line-height: 1.3;
+        }
+        .card-arrow {
+            font-size: 0.85rem;
+            color: #c0b8ac;
+            flex-shrink: 0;
+            transition: color 0.15s;
+        }
+        .card:hover .card-arrow { color: #7a6f60; }
+        footer {
+            margin-top: auto;
+            padding-top: 4rem;
+            font-size: 0.75rem;
+            color: #c0b8ac;
+            letter-spacing: 0.05em;
+            text-transform: uppercase;
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <h1>Tom's Apps</h1>
+        <div class="divider"></div>
+        <p>Small apps and experiments.</p>
+    </header>
+
+    <div class="grid">
+        <a href="sax/" class="card">
+            <div class="card-icon music">&#127927;</div>
+            <div class="card-body">
+                <div class="card-title">Honor's Sax Jam</div>
+                <div class="card-desc">A saxophone music game.</div>
+            </div>
+            <span class="card-arrow">&#8594;</span>
+        </a>
+        <a href="tuner/" class="card">
+            <div class="card-icon music">&#127928;</div>
+            <div class="card-body">
+                <div class="card-title">Guitar Tuner</div>
+                <div class="card-desc">Chromatic tuner &amp; chord library.</div>
+            </div>
+            <span class="card-arrow">&#8594;</span>
+        </a>
+        <a href="drums/" class="card">
+            <div class="card-icon music">&#129345;</div>
+            <div class="card-body">
+                <div class="card-title">Drum Machine</div>
+                <div class="card-desc">Step sequencer &amp; loop station.</div>
+            </div>
+            <span class="card-arrow">&#8594;</span>
+        </a>
+        <a href="decibel/" class="card">
+            <div class="card-icon tool">&#128266;</div>
+            <div class="card-body">
+                <div class="card-title">Decibel Meter</div>
+                <div class="card-desc">Sound level meter &amp; exposure tracker.</div>
+            </div>
+            <span class="card-arrow">&#8594;</span>
+        </a>
+        <a href="level/" class="card">
+            <div class="card-icon tool">&#128208;</div>
+            <div class="card-body">
+                <div class="card-title">Spirit Level</div>
+                <div class="card-desc">Bubble level, protractor &amp; plumb bob.</div>
+            </div>
+            <span class="card-arrow">&#8594;</span>
+        </a>
+        <a href="timer/" class="card">
+            <div class="card-icon fire">&#9201;</div>
+            <div class="card-body">
+                <div class="card-title">Gym Timer</div>
+                <div class="card-desc">HIIT, Tabata &amp; EMOM with voice cues.</div>
+            </div>
+            <span class="card-arrow">&#8594;</span>
+        </a>
+        <a href="reflex/" class="card">
+            <div class="card-icon fire">&#9889;</div>
+            <div class="card-body">
+                <div class="card-title">Reflex Lab</div>
+                <div class="card-desc">Reaction time &amp; aim trainer.</div>
+            </div>
+            <span class="card-arrow">&#8594;</span>
+        </a>
+        <a href="arcade/" class="card">
+            <div class="card-icon game">&#127918;</div>
+            <div class="card-body">
+                <div class="card-title">Retro Arcade</div>
+                <div class="card-desc">Asteroids, Breakout, Snake &amp; more.</div>
+            </div>
+            <span class="card-arrow">&#8594;</span>
+        </a>
+        <a href="battleship/" class="card">
+            <div class="card-icon game">&#128674;</div>
+            <div class="card-body">
+                <div class="card-title">Battleship</div>
+                <div class="card-desc">Classic naval combat vs AI.</div>
+            </div>
+            <span class="card-arrow">&#8594;</span>
+        </a>
+        <a href="poker/" class="card">
+            <div class="card-icon game">&#127183;</div>
+            <div class="card-body">
+                <div class="card-title">Poker Odds</div>
+                <div class="card-desc">Equity calculator &amp; hand trainer.</div>
+            </div>
+            <span class="card-arrow">&#8594;</span>
+        </a>
+        <a href="shop/" class="card">
+            <div class="card-icon tool">&#128295;</div>
+            <div class="card-body">
+                <div class="card-title">Shop Reference</div>
+                <div class="card-desc">Drill charts, conversions &amp; specs.</div>
+            </div>
+            <span class="card-arrow">&#8594;</span>
+        </a>
+        <a href="ballistics/" class="card">
+            <div class="card-icon earth">&#127919;</div>
+            <div class="card-body">
+                <div class="card-title">Ballistics Calc</div>
+                <div class="card-desc">Drop tables, wind drift &amp; range log.</div>
+            </div>
+            <span class="card-arrow">&#8594;</span>
+        </a>
+        <a href="terrain/" class="card">
+            <div class="card-icon earth">&#9968;</div>
+            <div class="card-body">
+                <div class="card-title">Terrain Flythrough</div>
+                <div class="card-desc">Procedural 3D landscape explorer.</div>
+            </div>
+            <span class="card-arrow">&#8594;</span>
+        </a>
+        <a href="hello/" class="card">
+            <div class="card-icon bolt">&#9889;</div>
+            <div class="card-body">
+                <div class="card-title">Hello World</div>
+                <div class="card-desc">Deployment smoke test.</div>
+            </div>
+            <span class="card-arrow">&#8594;</span>
+        </a>
+    </div>
+
+    <footer>Tom Hoeck</footer>
+</body>
+</html>
